@@ -2,10 +2,10 @@
   (:require [clojure.spec.gen.alpha :as gen]))
 
 (def char-uppercase-alphanumeric
-  (gen/such-that #(or (Character/isUpperCase %) (Character/isDigit %)) gen/char-alphanumeric))
+  (gen/such-that #(or (Character/isUpperCase %) (Character/isDigit %)) (gen/char-alphanumeric)))
 
 (def char-uppercase-alphabetic
-  (gen/such-that #(Character/isUpperCase %) gen/char-alphanumeric))
+  (gen/such-that #(Character/isUpperCase %) (gen/char-alphanumeric)))
 
 
 (def miseq-flowcell-id
