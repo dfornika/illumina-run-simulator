@@ -5,9 +5,12 @@
             [clojure.tools.cli :refer [parse-opts]]
             [clojure.spec.alpha :as s]
             [clojure.spec.gen.alpha :as gen]
-            [run-simulator.cli :as cli])
+            [run-simulator.cli :as cli]
+            [run-simulator.generators :as generators]
+            )
   (:import [java.time.format DateTimeFormatter]
            [java.time ZonedDateTime]
+           [java.time LocalDate]
            [java.io File])
   (:gen-class))
 
@@ -25,6 +28,9 @@
   []
   (.. (ZonedDateTime/now) (format DateTimeFormatter/ISO_OFFSET_DATE_TIME)))
 
+(defn iso-date-str->date
+  [iso-date-str]
+  (LocalDate/parse iso-date-str))
 
 (defn load-edn!
   "Load edn from an io/reader source (filename or io/resource).
@@ -66,6 +72,21 @@
     (str/join "\n" (conj data-lines-csv header))))
 
 
+
+(defn serialize-miseq-samplesheet
+  ""
+  [samplesheet]
+  (let [header (serialize-key-value-section (:Header samplesheet) "[Header]")
+        reads (str/join "\n" (conj (seq (:Reads samplesheet)) "[Reads]"))
+        settings (serialize-key-value-section (:Settings samplesheet) "[Settings]")
+        data "[Data]"]
+    (str/join "\n" [header
+                    reads
+                    settings
+                    data
+                    ""])))
+
+
 (defn serialize-nextseq-samplesheet
   ""
   [samplesheet]
@@ -84,6 +105,41 @@
                     cloud-settings
                     cloud-data
                     ""])))
+
+
+(defn int->well
+  "Given an integer `n`, return the well that corresponds. 0 -> A01, 95 -> H12. Wrap back to A01 for integers > 95 and repeat as needed."
+  [n]
+  (let [n-mod-96 (mod n 96)
+        rows ["A" "B" "C" "D" "E" "F" "G" "H"]
+        row (rows (quot n-mod-96 12))
+        col (format "%02d" (inc (rem n-mod-96 12)))
+        ]
+    (str row col)))
+
+
+(defn generate-run-id
+  [date-str instrument-id run-num instrument-type]
+  (let [six-digit-date (apply str (drop 2 (str/replace date-str "-" "")))
+        run-id (case instrument-type
+                 :miseq (first (gen/sample generators/miseq-flowcell-id 1))
+                 :nextseq (first (gen/sample generators/nextseq-flowcell-id 1)))]
+    (str/join "_" [six-digit-date
+                   instrument-id
+                   run-num
+                   run-id])))
+
+
+
+(defn simulate-run!
+  [db]
+  (let [current-date (str (:current-date @db))
+        instrument-id "M00123"
+        run-num 100
+        instrument-type :miseq
+        run-id (generate-run-id current-date instrument-id run-num instrument-type) ]
+    (println (str (now!) " Simulating run... " run-id))))
+
 
 (defn -main
   ""
@@ -105,17 +161,34 @@
   (if (get-in opts [:options :version])
     (cli/exit 0 cli/version))
 
-  (println opts)
-  (println @db)
+  (let [config (load-edn! (get-in opts [:options :config]))]
+    (swap! db assoc :config config))
+
+  (swap! db assoc :current-run-num-by-instrument-id
+         (into {} (map (juxt :instrument-id (fn [x] (identity 0))) (get-in @db [:config :instruments]))))
+
+  (swap! db assoc :current-date (iso-date-str->date (get-in @db [:config :starting-date])))
+
   
+  (loop []
+
+    (simulate-run! db)
+    (Thread/sleep (get-in @db [:config :run-interval-ms]))
+    (swap! db update :current-date #(.plusDays % 1))
+    (recur))
 
   )
 
 (comment
+  (def opts {:options {:config "config.edn"}})
   (s/conform ::miseq-run-id "220608_M00325_000000000-A6G32")
   (s/conform ::nextseq-run-id "220608_VH00123_000000000A6G32")
   (gen/generate (s/gen ::miseq-run-id))
+  (gen/sample generators/miseq-flowcell-id 1)
   (def nextseq-bclconvert-data-headers [:Sample_ID :Index :Index2])
   (def nextseq-cloud-data-headers [:Sample_ID :ProjectName :LibraryName :LibraryPrepKitUrn :LibraryPrepKitName :IndexAdapterKitUrn :IndexAdapterKitName])
+  (def miseq-data-headers [:Sample_ID :Sample_Name :Sample_Plate :Sample_Well :Index_Plate_Well :I7_Index_ID :index :I5_Index_ID :index2 :Sample_Project :Description])
+  
   (def nextseq-samplesheet-template (load-edn! (io/resource "samplesheet-template-nextseq.edn")))
+  (def miseq-samplesheet-template (load-edn! (io/resource "samplesheet-template-miseq.edn")))
   )

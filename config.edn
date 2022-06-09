@@ -1,4 +1,16 @@
-{:run-dirs [{:path "test_output/M00123/22"
-             :instrument-type :miseq}
-            {:path "test_output/VH00123/22"
-             :instrument-type :nextseq}]}
+{:instruments [{:instrument-id "M00123"
+                :output-dir "test_output/M00123/22"
+                :instrument-type :miseq
+                :starting-run-number 300}
+               {:instrument-id "VH00123"
+                :output-dir "test_output/VH00123/22"
+                :instrument-type :nextseq
+                :starting-run-number 12}]
+ :projects ["mysterious_experiment"
+            "routine_testing"
+            "quality_check"
+            "viral_outbreak"
+            "assay_development"]
+ :starting-plate-number 100
+ :starting-date "2022-06-01"
+ :run-interval-ms 10000}

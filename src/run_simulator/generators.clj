@@ -81,6 +81,7 @@
 
 (comment
   (gen/sample miseq-run-id 10)
+  (gen/sample miseq-flowcell-id 1)
   (gen/sample nextseq-run-id 10)
   (gen/sample library-id 10)
   )
