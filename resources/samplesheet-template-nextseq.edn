@@ -1,0 +1,16 @@
+{:Header {:FileFormatVersion "2"
+          :RunName ""
+          :InstrumentPlatform "NextSeq1k2k"
+          :InstrumentType "NextSeq2000"}
+ :Reads {:Read1Cycles 151
+         :Read2Cycles 151
+         :Index1Cycles 10
+         :Index2Cycles 10}
+ :Sequencing_Settings {:LibraryPrepKits "IlluminaDNAPrep"}
+ :BCLConvert_Settings {:SoftwareVersion "3.7.4"
+                       :AdapterRead1 "CTGTCTCTTATACACATCT"
+                       :AdapterRead2 "CTGTCTCTTATACACATCT"
+                       :FastqCompressionFormat "gzip"}
+ :BCLConvert_Data []
+ :Cloud_Settings {:GeneratedVersion "0.10.1.202102231441"}
+ :Cloud_Data []}

@@ -1,0 +1,4 @@
+{:run-dirs [{:path "test_output/M00123/22"
+             :instrument-type :miseq}
+            {:path "test_output/VH00123/22"
+             :instrument-type :nextseq}]}

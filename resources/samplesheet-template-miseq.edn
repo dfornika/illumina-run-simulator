@@ -1,0 +1,13 @@
+{:Header {:IEMFileVersion "5"
+          :Investigator_Name ""
+          :Experiment_Name "20220502-test"
+          :Date "5/2/2022"
+          :Workflow "GenerateFASTQ"
+          :Application "FASTQ Only"
+          :Instrument_Type "MiSeq"
+          :Assay "Illumina DNA Prep"
+          :Index_Adapters "IDT-Ilmn DNA-RNA UD Indexes SetA Tagmentation"}
+ :Reads [151 151]
+ :Settings {:ReverseComplement "0"
+            :Adapter "CTGTCTCTTATACACATCT"}
+ :Data []}
