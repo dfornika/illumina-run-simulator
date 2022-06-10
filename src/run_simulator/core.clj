@@ -1,13 +1,13 @@
 (ns run-simulator.core
   (:require [clojure.java.io :as io]
             [clojure.edn :as edn]
+            [clojure.data.json :as json]
             [clojure.string :as str]
             [clojure.tools.cli :refer [parse-opts]]
             [clojure.spec.alpha :as s]
             [clojure.spec.gen.alpha :as gen]
             [run-simulator.cli :as cli]
-            [run-simulator.generators :as generators]
-            )
+            [run-simulator.generators :as generators])
   (:import [java.time.format DateTimeFormatter]
            [java.time ZonedDateTime]
            [java.time LocalDate]
@@ -16,6 +16,11 @@
 
 
 (defonce db (atom {}))
+
+
+(defn log!
+  [m]
+  (println (json/write-str m :key-fn #(str/replace (name %) "-" "_") :escape-slash false)))
 
 (defn now!
   "Generate an ISO-8601 timestamp (`YYYY-MM-DDTHH:mm:ss.xxxx-OFFSET`).
@@ -28,9 +33,11 @@
   []
   (.. (ZonedDateTime/now) (format DateTimeFormatter/ISO_OFFSET_DATE_TIME)))
 
+
 (defn iso-date-str->date
   [iso-date-str]
   (LocalDate/parse iso-date-str))
+
 
 (defn load-edn!
   "Load edn from an io/reader source (filename or io/resource).
@@ -53,7 +60,9 @@
 
 (def miseq-run-id-regex #"^[0-9]{6}_M[0-9]{5}_000000000-[A-Z0-9]{5}$")
 
+
 (s/def ::miseq-run-id (s/and string? #(re-matches miseq-run-id-regex %)))
+
 
 (defn maps->csv-data 
   "Takes a collection of maps and returns csv-data 
@@ -70,7 +79,6 @@
   (let [data-lines (map (juxt (comp name first) second) data)
         data-lines-csv (map #(str/join "," %) data-lines)]
     (str/join "\n" (conj data-lines-csv header))))
-
 
 
 (defn serialize-miseq-samplesheet
@@ -130,15 +138,36 @@
                    run-id])))
 
 
+(defn randomly-select
+  [coll]
+  (let [num-items (count coll)]
+    (nth coll (rand-int num-items))))
+
 
 (defn simulate-run!
   [db]
   (let [current-date (str (:current-date @db))
-        instrument-id "M00123"
-        run-num 100
-        instrument-type :miseq
-        run-id (generate-run-id current-date instrument-id run-num instrument-type) ]
-    (println (str (now!) " Simulating run... " run-id))))
+        instrument (randomly-select (get-in @db [:config :instruments]))
+        instrument-id (:instrument-id instrument)
+        run-num (get-in @db [:current-run-num-by-instrument-id instrument-id])
+        instrument-type (:instrument-type instrument)
+        run-id (generate-run-id current-date instrument-id run-num instrument-type)
+        run-output-dir (io/file (:output-dir instrument) run-id)
+        samplesheet-template (case instrument-type :miseq (load-edn! (io/resource "samplesheet-template-miseq.edn")) :nextseq (load-edn! (io/resource "samplesheet-template-nextseq.edn")))
+        samplesheet-data samplesheet-template
+        samplesheet-string (case instrument-type :miseq (serialize-miseq-samplesheet samplesheet-data) :nextseq (serialize-nextseq-samplesheet samplesheet-data))
+        samplesheet-file (io/file run-output-dir "SampleSheet.csv")
+        fastq-subdir (io/file run-output-dir (case instrument-type :miseq "Data/Intensities/BaseCalls" :nextseq "Analysis/1/Data/fastq"))
+        upload-complete-file (io/file run-output-dir "upload_complete.json")]
+    (.mkdirs run-output-dir)
+    (log! {:timestamp (now!) :event "created_run_output_dir" :run-id run-id :run-output-dir (str run-output-dir)})
+    (spit samplesheet-file samplesheet-string)
+    (log! {:timestamp (now!) :event "created_samplesheet_file" :run-id run-id :samplesheet-file (str samplesheet-file)})
+    (.mkdirs fastq-subdir)
+    (log! {:timestamp (now!) :event "created_fastq_subdir" :run-id run-id :fastq-subdir (str fastq-subdir)})
+    (.createNewFile upload-complete-file)
+    (log! {:timestamp (now!) :event "created_upload_complete_file" :run-id run-id :upload-complete-file (str upload-complete-file)})
+    (swap! db update-in [:current-run-num-by-instrument-id instrument-id] inc)))
 
 
 (defn -main
@@ -165,7 +194,7 @@
     (swap! db assoc :config config))
 
   (swap! db assoc :current-run-num-by-instrument-id
-         (into {} (map (juxt :instrument-id (fn [x] (identity 0))) (get-in @db [:config :instruments]))))
+         (into {} (map (juxt :instrument-id :starting-run-number) (get-in @db [:config :instruments]))))
 
   (swap! db assoc :current-date (iso-date-str->date (get-in @db [:config :starting-date])))
 
