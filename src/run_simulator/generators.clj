@@ -78,10 +78,14 @@
       (gen/bind (fn [x] (gen/fmap #(str x (format "%03d" %)) (gen/choose 0 999))))
       (gen/bind (fn [x] (gen/fmap #(str x %) char-uppercase-alphabetic)))))
 
+(def container-id
+  (-> (gen/return "R")
+      (gen/bind (fn [x] (gen/fmap #(str x (format "%010d" %)) (gen/choose 0 9999999999))))))
 
 (comment
   (gen/sample miseq-run-id 10)
   (gen/sample miseq-flowcell-id 1)
   (gen/sample nextseq-run-id 10)
   (gen/sample library-id 10)
+  (gen/sample container-id 1)
   )

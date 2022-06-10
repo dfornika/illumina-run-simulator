@@ -1,6 +1,7 @@
 (ns run-simulator.core
   (:require [clojure.java.io :as io]
             [clojure.edn :as edn]
+            [clojure.data.csv :as csv]
             [clojure.data.json :as json]
             [clojure.string :as str]
             [clojure.tools.cli :refer [parse-opts]]
@@ -64,14 +65,29 @@
 (s/def ::miseq-run-id (s/and string? #(re-matches miseq-run-id-regex %)))
 
 
+(defn csv-data->maps [csv-data]
+  (map zipmap
+       (->> (first csv-data) ;; First row is the header
+            (map keyword)    ;; Drop if you want string keys instead
+            repeat)
+	  (rest csv-data)))
+
+
 (defn maps->csv-data 
   "Takes a collection of maps and returns csv-data 
    (vector of vectors with all values)."       
-   [maps]
-   (let [columns (-> maps first keys)
-         headers (mapv name columns)
-         rows (mapv #(mapv % columns) maps)]
-     (into [headers] rows)))
+  [maps]
+  (let [columns (-> maps first keys)
+        headers (mapv name columns)
+        rows (mapv #(mapv % columns) maps)]
+    (into [headers] rows)))
+
+
+(defn load-csv!
+  [source]
+  (with-open [reader (io/reader source)]
+    (doall
+     (csv-data->maps (csv/read-csv reader)))))
 
 
 (defn serialize-key-value-section
@@ -144,6 +160,19 @@
     (nth coll (rand-int num-items))))
 
 
+(defn generate-sample-id
+  [plate-num index]
+  (str/join "-" [(first (gen/sample generators/container-id 1))
+                 plate-num
+                 (:Index_Set index)
+                 (:Index_Plate_Well index)]))
+
+(defn generate-sample
+  [plate-num index]
+  (let [sample-id (generate-sample-id plate-num index)]
+    (assoc index :Sample_ID sample-id)))
+
+
 (defn simulate-run!
   [db]
   (let [current-date (str (:current-date @db))
@@ -153,6 +182,10 @@
         instrument-type (:instrument-type instrument)
         run-id (generate-run-id current-date instrument-id run-num instrument-type)
         run-output-dir (io/file (:output-dir instrument) run-id)
+        indexes-file (case instrument-type :miseq (io/resource "indexes-miseq.csv") :nextseq (io/resource "indexes-nextseq.csv"))
+        indexes (load-csv! indexes-file)
+        num-samples (rand-int (count indexes))
+        samples (map #(generate-sample (:current-plate-number @db) %) (take num-samples indexes))
         samplesheet-template (case instrument-type :miseq (load-edn! (io/resource "samplesheet-template-miseq.edn")) :nextseq (load-edn! (io/resource "samplesheet-template-nextseq.edn")))
         samplesheet-data samplesheet-template
         samplesheet-string (case instrument-type :miseq (serialize-miseq-samplesheet samplesheet-data) :nextseq (serialize-nextseq-samplesheet samplesheet-data))
@@ -161,10 +194,14 @@
         upload-complete-file (io/file run-output-dir "upload_complete.json")]
     (.mkdirs run-output-dir)
     (log! {:timestamp (now!) :event "created_run_output_dir" :run-id run-id :run-output-dir (str run-output-dir)})
+    (log! {:timestamp (now!) :event "created_samples" :run-id run-id :num-samples (count samples)})
     (spit samplesheet-file samplesheet-string)
     (log! {:timestamp (now!) :event "created_samplesheet_file" :run-id run-id :samplesheet-file (str samplesheet-file)})
     (.mkdirs fastq-subdir)
     (log! {:timestamp (now!) :event "created_fastq_subdir" :run-id run-id :fastq-subdir (str fastq-subdir)})
+    (doseq [sample samples] (.createNewFile (io/file fastq-subdir (str (:Sample_ID sample) "_S_L001_R1_001.fastq.gz"))))
+    (doseq [sample samples] (.createNewFile (io/file fastq-subdir (str (:Sample_ID sample) "_S_L001_R2_001.fastq.gz"))))
+    (log! {:timestamp (now!) :event "created_fastq_symlinks" :run-id run-id :fastq-subdir (str fastq-subdir) :num-symlinks (* num-samples 2)})
     (.createNewFile upload-complete-file)
     (log! {:timestamp (now!) :event "created_upload_complete_file" :run-id run-id :upload-complete-file (str upload-complete-file)})
     (swap! db update-in [:current-run-num-by-instrument-id instrument-id] inc)))
@@ -197,6 +234,8 @@
          (into {} (map (juxt :instrument-id :starting-run-number) (get-in @db [:config :instruments]))))
 
   (swap! db assoc :current-date (iso-date-str->date (get-in @db [:config :starting-date])))
+
+  (swap! db assoc :current-plate-number (get-in @db [:config :starting-plate-number]))
 
   
   (loop []
