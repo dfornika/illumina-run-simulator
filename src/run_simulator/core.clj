@@ -97,13 +97,21 @@
     (str/join "\n" (conj data-lines-csv header))))
 
 
+(defn maps->csv-str
+  [maps]
+  (->> maps
+       maps->csv-data
+       (map #(str/join "," %))
+       (str/join "\n")))
+
+
 (defn serialize-miseq-samplesheet
   ""
   [samplesheet]
   (let [header (serialize-key-value-section (:Header samplesheet) "[Header]")
         reads (str/join "\n" (conj (seq (:Reads samplesheet)) "[Reads]"))
         settings (serialize-key-value-section (:Settings samplesheet) "[Settings]")
-        data "[Data]"]
+        data (str/join "\n" ["[Data]" (maps->csv-str (map #(select-keys % [:Sample_ID :Index_Plate_Well :I7_Index_ID :index :I5_Index_ID :index2]) (:Data samplesheet)))])]
     (str/join "\n" [header
                     reads
                     settings
@@ -167,6 +175,7 @@
                  (:Index_Set index)
                  (:Index_Plate_Well index)]))
 
+
 (defn generate-sample
   [plate-num index]
   (let [sample-id (generate-sample-id plate-num index)]
@@ -187,7 +196,7 @@
         num-samples (rand-int (count indexes))
         samples (map #(generate-sample (:current-plate-number @db) %) (take num-samples indexes))
         samplesheet-template (case instrument-type :miseq (load-edn! (io/resource "samplesheet-template-miseq.edn")) :nextseq (load-edn! (io/resource "samplesheet-template-nextseq.edn")))
-        samplesheet-data samplesheet-template
+        samplesheet-data (case instrument-type :miseq (assoc samplesheet-template :Data samples) :nextseq (assoc samplesheet-template :BCLConvert_Data samples))
         samplesheet-string (case instrument-type :miseq (serialize-miseq-samplesheet samplesheet-data) :nextseq (serialize-nextseq-samplesheet samplesheet-data))
         samplesheet-file (io/file run-output-dir "SampleSheet.csv")
         fastq-subdir (io/file run-output-dir (case instrument-type :miseq "Data/Intensities/BaseCalls" :nextseq "Analysis/1/Data/fastq"))
