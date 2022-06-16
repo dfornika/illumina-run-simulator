@@ -37,5 +37,6 @@ This tool expects an [edn](https://github.com/edn-format/edn)-formatted config f
             "assay_development"]
  :starting-plate-number 100
  :starting-date "2022-06-01"
- :run-interval-ms 10000}
+ :run-interval-ms 10000
+ :mark-upload-complete true}
 ```

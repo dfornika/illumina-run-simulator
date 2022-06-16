@@ -256,8 +256,9 @@
     (doseq [[sample-num sample] (map-indexed vector samples)] (.createNewFile (io/file fastq-subdir (str (:Sample_ID sample) "_S" sample-num "_L001_R1_001.fastq.gz"))))
     (doseq [[sample-num sample] (map-indexed vector samples)] (.createNewFile (io/file fastq-subdir (str (:Sample_ID sample) "_S" sample-num "_L001_R2_001.fastq.gz"))))
     (log! {:timestamp (now!) :event "created_fastq_symlinks" :run-id run-id :fastq-subdir (str fastq-subdir) :num-symlinks (* num-samples 2)})
-    (.createNewFile upload-complete-file)
-    (log! {:timestamp (now!) :event "created_upload_complete_file" :run-id run-id :upload-complete-file (str upload-complete-file)})
+    (when (get-in @db [:config :mark-upload-complete])
+      (.createNewFile upload-complete-file)
+      (log! {:timestamp (now!) :event "created_upload_complete_file" :run-id run-id :upload-complete-file (str upload-complete-file)}))
     (swap! db update-in [:current-run-num-by-instrument-id instrument-id] inc)))
 
 
