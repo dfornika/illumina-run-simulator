@@ -1,5 +1,5 @@
 # Illumina Run Simulator
-This is a helper utility designed to assist with testing and development of [BCCDC-PHL/auto-fastq-symlink](https://github.com/BCCDC-PHL/auto-fastq-symlink).
+This is a helper utility designed to assist with testing and development of [BCCDC-PHL/auto-fastq-symlink](https://github.com/BCCDC-PHL/auto-fastq-symlink) and [BCCDC-PHL/illumina-uploader](https://github.com/BCCDC-PHL/illumina-uploader).
 
 ## Building & Usage
 The [clojure command-line](https://clojure.org/guides/install_clojure) package (`clj`) is required for building this tool.
