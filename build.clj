@@ -3,7 +3,7 @@
 
 (def lib 'io.github.dfornika/illumina-run-simulator)
 (def main-ns 'run-simulator.core)
-(def version "0.1.0-alpha")
+(def version "0.1.0")
 (def class-dir "target/classes")
 (def basis (b/create-basis {:project "deps.edn"}))
 (def uber-file (format "target/%s-%s-standalone.jar" (name lib) version))
