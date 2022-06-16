@@ -1,7 +1,7 @@
 (ns build
   (:require [clojure.tools.build.api :as b]))
 
-(def lib 'io.github.dfornika/run-simulator)
+(def lib 'io.github.dfornika/illumina-run-simulator)
 (def main-ns 'run-simulator.core)
 (def version "0.1.0-alpha")
 (def class-dir "target/classes")
