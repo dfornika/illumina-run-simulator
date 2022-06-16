@@ -43,7 +43,7 @@
 (defn load-edn!
   "Load edn from an io/reader source (filename or io/resource).
    https://clojuredocs.org/clojure.edn/read#example-5a68f384e4b09621d9f53a79
-   takes:
+  takes:
      `source`: Path to edn file to load (`String`)
    returns:
      Data structure as determined by `source`.
@@ -76,11 +76,9 @@
 (defn maps->csv-data 
   "Takes a collection of maps and returns csv-data 
    (vector of vectors with all values)."       
-  [maps]
-  (let [columns (-> maps first keys)
-        headers (mapv name columns)
-        rows (mapv #(mapv % columns) maps)]
-    (into [headers] rows)))
+  [maps headers]
+  (let [rows (mapv #(mapv % headers) maps)]
+    (into [(map name headers)] rows)))
 
 
 (defn load-csv!
@@ -98,9 +96,9 @@
 
 
 (defn maps->csv-str
-  [maps]
+  [maps headers]
   (->> maps
-       maps->csv-data
+       (#(maps->csv-data % headers))
        (map #(str/join "," %))
        (str/join "\n")))
 
@@ -111,7 +109,8 @@
   (let [header (serialize-key-value-section (:Header samplesheet) "[Header]")
         reads (str/join "\n" (conj (seq (:Reads samplesheet)) "[Reads]"))
         settings (serialize-key-value-section (:Settings samplesheet) "[Settings]")
-        data (str/join "\n" ["[Data]" (maps->csv-str (map #(select-keys % [:Sample_ID :Index_Plate_Well :I7_Index_ID :index :I5_Index_ID :index2]) (:Data samplesheet)))])]
+        data-section-keys [:Sample_ID :Sample_Name :Sample_Plate :Sample_Well :Index_Plate_Well :I7_Index_ID :index :I5_Index_ID :index2 :Sample_Project :Description]
+        data (str/join "\n" ["[Data]" (maps->csv-str (map #(select-keys % data-section-keys) (:Data samplesheet)) data-section-keys)])]
     (str/join "\n" [header
                     reads
                     settings
@@ -177,9 +176,33 @@
 
 
 (defn generate-sample
-  [plate-num index]
-  (let [sample-id (generate-sample-id plate-num index)]
-    (assoc index :Sample_ID sample-id)))
+  ;; {:miseq-data-headers [:Sample_ID :Sample_Name :Sample_Plate :Sample_Well :Index_Plate_Well :I7_Index_ID :index :I5_Index_ID :index2 :Sample_Project :Description]
+  ;;  :nextseq-bclconvert-data-headers  [:Sample_ID :Index :Index2]
+  ;;  :nextseq-cloud-data-headers [:Sample_ID :ProjectName :LibraryName :LibraryPrepKitUrn :LibraryPrepKitName :IndexAdapterKitUrn :IndexAdapterKitName]}
+  [plate-num instrument-type index]
+  (let [sample-id (generate-sample-id plate-num index)
+        index-with-sample-id (assoc index :Sample_ID sample-id)
+        blank-fields (case instrument-type
+                       :miseq [:Sample_Name :Sample_Well :Sample_Project :Description]
+                       :nextseq [:Index :Index2 :ProjectName :LibraryName :LibraryPrepKitUrn :LibraryPrepKitName :IndexAdapterKitUrn :IndexAdapterKitName])]
+    (reduce #(assoc % %2 "") index-with-sample-id blank-fields)
+    ))
+
+
+(defn generate-samples
+  [num-samples indexes instrument-type db]
+  (loop [num-generated 1
+         plate-num (get @db :current-plate-number)
+         available-indexes indexes
+         samples []]
+    (if (>= num-generated num-samples)
+      samples
+      (recur (inc num-generated)
+             (do (when (= (mod num-generated 96) 0)
+                   (swap! db update :current-plate-number inc))
+                 (get @db :current-plate-number))
+             (drop 1 available-indexes)
+             (conj samples (generate-sample plate-num instrument-type (first available-indexes)))))))
 
 
 (defn simulate-run!
@@ -194,7 +217,7 @@
         indexes-file (case instrument-type :miseq (io/resource "indexes-miseq.csv") :nextseq (io/resource "indexes-nextseq.csv"))
         indexes (load-csv! indexes-file)
         num-samples (rand-int (count indexes))
-        samples (map #(generate-sample (:current-plate-number @db) %) (take num-samples indexes))
+        samples (map #(generate-sample (:current-plate-number @db) instrument-type %) (take num-samples indexes))
         samplesheet-template (case instrument-type :miseq (load-edn! (io/resource "samplesheet-template-miseq.edn")) :nextseq (load-edn! (io/resource "samplesheet-template-nextseq.edn")))
         samplesheet-data (case instrument-type :miseq (assoc samplesheet-template :Data samples) :nextseq (assoc samplesheet-template :BCLConvert_Data samples))
         samplesheet-string (case instrument-type :miseq (serialize-miseq-samplesheet samplesheet-data) :nextseq (serialize-nextseq-samplesheet samplesheet-data))
