@@ -5,8 +5,9 @@
             [clojure.data.json :as json]
             [clojure.string :as str]
             [clojure.tools.cli :refer [parse-opts]]
-            [clojure.spec.alpha :as s]
-            [clojure.spec.gen.alpha :as gen]
+            [clojure.spec.alpha :as spec]
+            [clojure.spec.gen.alpha :as spec-gen]
+            [clojure.spec.test.alpha :as spec-test]
             [run-simulator.cli :as cli]
             [run-simulator.generators :as generators])
   (:import [java.time.format DateTimeFormatter]
@@ -62,7 +63,7 @@
 (def miseq-run-id-regex #"^[0-9]{6}_M[0-9]{5}_000000000-[A-Z0-9]{5}$")
 
 
-(s/def ::miseq-run-id (s/and string? #(re-matches miseq-run-id-regex %)))
+(spec/def ::miseq-run-id (spec/and string? #(re-matches miseq-run-id-regex %)))
 
 
 (defn csv-data->maps [csv-data]
@@ -146,17 +147,23 @@
   (let [n-mod-96 (mod n 96)
         rows ["A" "B" "C" "D" "E" "F" "G" "H"]
         row (rows (quot n-mod-96 12))
-        col (format "%02d" (inc (rem n-mod-96 12)))
-        ]
+        col (format "%02d" (inc (rem n-mod-96 12)))]
     (str row col)))
+
+
+(spec/fdef int->well
+  :args (spec/cat :n int?)
+  :ret (spec/and string?
+                 #(contains? #{\A \B \C \D \E \F \G \H} (first %))
+                 #(= 3 (count %))))
 
 
 (defn generate-run-id
   [date-str instrument-id run-num instrument-type]
   (let [six-digit-date (apply str (drop 2 (str/replace date-str "-" "")))
         run-id (case instrument-type
-                 :miseq (first (gen/sample generators/miseq-flowcell-id 1))
-                 :nextseq (first (gen/sample generators/nextseq-flowcell-id 1)))]
+                 :miseq (first (spec-gen/sample generators/miseq-flowcell-id 1))
+                 :nextseq (first (spec-gen/sample generators/nextseq-flowcell-id 1)))]
     (str/join "_" [six-digit-date
                    instrument-id
                    run-num
@@ -171,7 +178,7 @@
 
 (defn generate-sample-id
   [plate-num index]
-  (str/join "-" [(first (gen/sample generators/container-id 1))
+  (str/join "-" [(first (spec-gen/sample generators/container-id 1))
                  plate-num
                  (:Index_Set index)
                  (:Index_Plate_Well index)]))
@@ -282,10 +289,10 @@
 
 (comment
   (def opts {:options {:config "config.edn"}})
-  (s/conform ::miseq-run-id "220608_M00325_000000000-A6G32")
-  (s/conform ::nextseq-run-id "220608_VH00123_000000000A6G32")
-  (gen/generate (s/gen ::miseq-run-id))
-  (gen/sample generators/miseq-flowcell-id 1)
+  (spec/conform ::miseq-run-id "220608_M00325_000000000-A6G32")
+  (spec/conform ::nextseq-run-id "220608_VH00123_000000000A6G32")
+  (spec-gen/generate (spec/gen ::miseq-run-id))
+  (spec-gen/sample generators/miseq-flowcell-id 1)
   (def nextseq-bclconvert-data-headers [:Sample_ID :Index :Index2])
   (def nextseq-cloud-data-headers [:Sample_ID :ProjectName :LibraryName :LibraryPrepKitUrn :LibraryPrepKitName :IndexAdapterKitUrn :IndexAdapterKitName])
   (def miseq-data-headers [:Sample_ID :Sample_Name :Sample_Plate :Sample_Well :Index_Plate_Well :I7_Index_ID :index :I5_Index_ID :index2 :Sample_Project :Description])

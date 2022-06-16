@@ -1,8 +1,10 @@
 (ns run-simulator.generators
   (:require [clojure.spec.gen.alpha :as gen]))
 
+
 (def char-uppercase-alphanumeric
   (gen/such-that #(or (Character/isUpperCase %) (Character/isDigit %)) (gen/char-alphanumeric)))
+
 
 (def char-uppercase-alphabetic
   (gen/such-that #(Character/isUpperCase %) (gen/char-alphanumeric)))
@@ -10,6 +12,7 @@
 
 (def miseq-flowcell-id
   (gen/fmap #(apply str "000000000-" %) (gen/vector char-uppercase-alphanumeric 5)))
+
 
 (def nextseq-flowcell-id
   (gen/fmap #(apply str "AAA" %) (gen/vector char-uppercase-alphanumeric 6)))
@@ -54,6 +57,7 @@
 (def miseq-instrument-id
   (gen/fmap #(str "M" %) (make-zero-padded-num 1 9999 5)))
 
+
 (def nextseq-instrument-id
   (gen/fmap #(str "VH" %) (make-zero-padded-num 1 999 5)))
 
@@ -63,6 +67,7 @@
       (gen/bind (fn [x] (gen/fmap #(str x "_" %) miseq-instrument-id)))
       (gen/bind (fn [x] (gen/fmap #(str x "_" %) (make-zero-padded-num 1 9999 4))))
       (gen/bind (fn [x] (gen/fmap #(str x "_" %) miseq-flowcell-id)))))
+
 
 (def nextseq-run-id
   (-> six-digit-date
@@ -81,6 +86,7 @@
 (def container-id
   (-> (gen/return "R")
       (gen/bind (fn [x] (gen/fmap #(str x (format "%010d" %)) (gen/choose 0 9999999999))))))
+
 
 (comment
   (gen/sample miseq-run-id 10)
