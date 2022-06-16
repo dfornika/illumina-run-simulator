@@ -1,7 +1,13 @@
 {:instruments [{:instrument-id "M00123"
                 :output-dir "test_output/M00123/22"
+                :output-dir-structure :old
                 :instrument-type :miseq
                 :starting-run-number 300}
+               {:instrument-id "M00456"
+                :output-dir "test_output/M00456/22"
+                :output-dir-structure :new
+                :instrument-type :miseq
+                :starting-run-number 256}
                {:instrument-id "VH00123"
                 :output-dir "test_output/VH00123/22"
                 :instrument-type :nextseq

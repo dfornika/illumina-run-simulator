@@ -54,6 +54,12 @@
             (fn [year] (gen/fmap #(str year %) four-digit-date))))
 
 
+(def six-digit-timestamp
+  (-> (make-zero-padded-num 0 24 2)
+      (gen/bind (fn [x] (gen/fmap #(str x %) (make-zero-padded-num 0 60 2))))
+      (gen/bind (fn [x] (gen/fmap #(str x %) (make-zero-padded-num 0 60 2))))))
+
+
 (def miseq-instrument-id
   (gen/fmap #(str "M" %) (make-zero-padded-num 1 9999 5)))
 

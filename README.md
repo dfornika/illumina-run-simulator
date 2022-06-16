@@ -18,6 +18,12 @@ This tool expects an [edn](https://github.com/edn-format/edn)-formatted config f
 ```edn
 {:instruments [{:instrument-id "M00123"
                 :output-dir "test_output/M00123/22"
+                :output-dir-structure :old
+                :instrument-type :miseq
+                :starting-run-number 300}
+               {:instrument-id "M00456"
+                :output-dir "test_output/M00456/22"
+                :output-dir-structure :new
                 :instrument-type :miseq
                 :starting-run-number 300}
                {:instrument-id "VH00123"

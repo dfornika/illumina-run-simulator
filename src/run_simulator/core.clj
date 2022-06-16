@@ -192,7 +192,7 @@
   (let [sample-id (generate-sample-id plate-num index)
         index-with-sample-id (assoc index :Sample_ID sample-id)
         blank-fields (case instrument-type
-                       :miseq [:Sample_Name :Sample_Well :Sample_Project :Description]
+                       :miseq [:Sample_Name :Sample_Plate :Sample_Well :Sample_Project :Description]
                        :nextseq [:ProjectName :LibraryName :LibraryPrepKitUrn :LibraryPrepKitName :IndexAdapterKitUrn :IndexAdapterKitName])]
     (reduce #(assoc % %2 "") index-with-sample-id blank-fields)))
 
@@ -213,6 +213,17 @@
              (conj samples (generate-sample plate-num instrument-type (first available-indexes)))))))
 
 
+(defn miseq-fastq-subdir
+  ([output-dir-strucutre-type db]
+   (case output-dir-strucutre-type
+     :old "Data/Intensities/BaseCalls"
+     :new (str (io/file "Alignment_1" (str (str/replace (str (:current-date @db)) "-" "") "_" (first (spec-gen/sample generators/six-digit-timestamp 1))) "Fastq"))))
+  ([output-dir-strucutre-type demultiplexing-num db]
+   (case output-dir-strucutre-type
+     :old "Data/Intensities/BaseCalls"
+     :new (str (io/file (str "Alignment_" demultiplexing-num) (str (str/replace (str (:current-date @db)) "-" "") "_" (first (spec-gen/sample generators/six-digit-timestamp 1))) "Fastq")))))
+
+
 (defn simulate-run!
   [db]
   (let [current-date (str (:current-date @db))
@@ -230,7 +241,7 @@
         samplesheet-data (case instrument-type :miseq (assoc samplesheet-template :Data samples) :nextseq (assoc samplesheet-template :BCLConvert_Data samples :Cloud_Data samples))
         samplesheet-string (case instrument-type :miseq (serialize-miseq-samplesheet samplesheet-data) :nextseq (serialize-nextseq-samplesheet samplesheet-data))
         samplesheet-file (io/file run-output-dir "SampleSheet.csv")
-        fastq-subdir (io/file run-output-dir (case instrument-type :miseq "Data/Intensities/BaseCalls" :nextseq "Analysis/1/Data/fastq"))
+        fastq-subdir (io/file run-output-dir (case instrument-type :miseq (miseq-fastq-subdir (:output-dir-structure instrument) db) :nextseq "Analysis/1/Data/fastq"))
         upload-complete-file (io/file run-output-dir "upload_complete.json")]
     (.mkdirs run-output-dir)
     (log! {:timestamp (now!) :event "created_run_output_dir" :run-id run-id :run-output-dir (str run-output-dir)})
