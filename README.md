@@ -9,7 +9,7 @@ The `build.sh` script in this repo will build an executable uberjar and save it 
 Run the `.jar` file as follows. A config file is required. The format of the config file is described in the next section.
 
 ```
-java -jar run-simulator.jar --config config.edn
+java -jar illumina-run-simulator.jar --config config.edn
 ```
 
 ## Configuration
