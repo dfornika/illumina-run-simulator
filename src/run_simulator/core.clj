@@ -125,9 +125,11 @@
         reads (serialize-key-value-section (:Reads samplesheet) "[Reads]")
         sequencing-settings (serialize-key-value-section (:Sequencing_Settings samplesheet) "[Sequencing_Settings]")
         bclconvert-settings (serialize-key-value-section (:BCLConvert_Settings samplesheet) "[BCLConvert_Settings]")
-        bclconvert-data "[BCLConvert_Data]"
+        bclconvert-data-section-keys [:Sample_ID :Index :Index2]
+        bclconvert-data (str/join "\n" ["[BCLConvert_Data]" (maps->csv-str (map #(select-keys % bclconvert-data-section-keys) (:BCLConvert_Data samplesheet)) bclconvert-data-section-keys)])
         cloud-settings (serialize-key-value-section (:Cloud_Settings samplesheet) "[Cloud_Settings]")
-        cloud-data "[Cloud_Data]"]
+        cloud-data-section-keys [:Sample_ID :ProjectName :LibraryName :LibraryPrepKitUrn :LibraryPrepKitName :IndexAdapterKitUrn :IndexAdapterKitName]
+        cloud-data (str/join "\n" ["[Cloud_Data]" (maps->csv-str (map #(select-keys % cloud-data-section-keys) (:Cloud_Data samplesheet)) cloud-data-section-keys)])]
     (str/join "\n" [header
                     reads
                     sequencing-settings
@@ -184,9 +186,8 @@
         index-with-sample-id (assoc index :Sample_ID sample-id)
         blank-fields (case instrument-type
                        :miseq [:Sample_Name :Sample_Well :Sample_Project :Description]
-                       :nextseq [:Index :Index2 :ProjectName :LibraryName :LibraryPrepKitUrn :LibraryPrepKitName :IndexAdapterKitUrn :IndexAdapterKitName])]
-    (reduce #(assoc % %2 "") index-with-sample-id blank-fields)
-    ))
+                       :nextseq [:ProjectName :LibraryName :LibraryPrepKitUrn :LibraryPrepKitName :IndexAdapterKitUrn :IndexAdapterKitName])]
+    (reduce #(assoc % %2 "") index-with-sample-id blank-fields)))
 
 
 (defn generate-samples
@@ -219,7 +220,7 @@
         num-samples (rand-int (count indexes))
         samples (map #(generate-sample (:current-plate-number @db) instrument-type %) (take num-samples indexes))
         samplesheet-template (case instrument-type :miseq (load-edn! (io/resource "samplesheet-template-miseq.edn")) :nextseq (load-edn! (io/resource "samplesheet-template-nextseq.edn")))
-        samplesheet-data (case instrument-type :miseq (assoc samplesheet-template :Data samples) :nextseq (assoc samplesheet-template :BCLConvert_Data samples))
+        samplesheet-data (case instrument-type :miseq (assoc samplesheet-template :Data samples) :nextseq (assoc samplesheet-template :BCLConvert_Data samples :Cloud_Data samples))
         samplesheet-string (case instrument-type :miseq (serialize-miseq-samplesheet samplesheet-data) :nextseq (serialize-nextseq-samplesheet samplesheet-data))
         samplesheet-file (io/file run-output-dir "SampleSheet.csv")
         fastq-subdir (io/file run-output-dir (case instrument-type :miseq "Data/Intensities/BaseCalls" :nextseq "Analysis/1/Data/fastq"))
