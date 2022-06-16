@@ -188,13 +188,16 @@
   ;; {:miseq-data-headers [:Sample_ID :Sample_Name :Sample_Plate :Sample_Well :Index_Plate_Well :I7_Index_ID :index :I5_Index_ID :index2 :Sample_Project :Description]
   ;;  :nextseq-bclconvert-data-headers  [:Sample_ID :Index :Index2]
   ;;  :nextseq-cloud-data-headers [:Sample_ID :ProjectName :LibraryName :LibraryPrepKitUrn :LibraryPrepKitName :IndexAdapterKitUrn :IndexAdapterKitName]}
-  [plate-num instrument-type index]
+  [plate-num instrument-type index db]
   (let [sample-id (generate-sample-id plate-num index)
         index-with-sample-id (assoc index :Sample_ID sample-id)
+        project-id (randomly-select (conj (get-in @db [:config :projects]) ""))
+        project-key (case instrument-type :miseq :Sample_Project :nextseq :ProjectName)
+        index-with-sample-id-and-project-id (assoc index-with-sample-id project-key project-id)
         blank-fields (case instrument-type
-                       :miseq [:Sample_Name :Sample_Plate :Sample_Well :Sample_Project :Description]
-                       :nextseq [:ProjectName :LibraryName :LibraryPrepKitUrn :LibraryPrepKitName :IndexAdapterKitUrn :IndexAdapterKitName])]
-    (reduce #(assoc % %2 "") index-with-sample-id blank-fields)))
+                       :miseq [:Sample_Name :Sample_Plate :Sample_Well :Description]
+                       :nextseq [:LibraryName :LibraryPrepKitUrn :LibraryPrepKitName :IndexAdapterKitUrn :IndexAdapterKitName])]
+    (reduce #(assoc % %2 "") index-with-sample-id-and-project-id blank-fields)))
 
 
 (defn generate-samples
@@ -210,7 +213,7 @@
                    (swap! db update :current-plate-number inc))
                  (get @db :current-plate-number))
              (drop 1 available-indexes)
-             (conj samples (generate-sample plate-num instrument-type (first available-indexes)))))))
+             (conj samples (generate-sample plate-num instrument-type (first available-indexes) db))))))
 
 
 (defn miseq-fastq-subdir
@@ -236,7 +239,7 @@
         indexes-file (case instrument-type :miseq (io/resource "indexes-miseq.csv") :nextseq (io/resource "indexes-nextseq.csv"))
         indexes (load-csv! indexes-file)
         num-samples (rand-int (count indexes))
-        samples (map #(generate-sample (:current-plate-number @db) instrument-type %) (take num-samples indexes))
+        samples (map #(generate-sample (:current-plate-number @db) instrument-type % db) (take num-samples indexes))
         samplesheet-template (case instrument-type :miseq (load-edn! (io/resource "samplesheet-template-miseq.edn")) :nextseq (load-edn! (io/resource "samplesheet-template-nextseq.edn")))
         samplesheet-data (case instrument-type :miseq (assoc samplesheet-template :Data samples) :nextseq (assoc samplesheet-template :BCLConvert_Data samples :Cloud_Data samples))
         samplesheet-string (case instrument-type :miseq (serialize-miseq-samplesheet samplesheet-data) :nextseq (serialize-nextseq-samplesheet samplesheet-data))
