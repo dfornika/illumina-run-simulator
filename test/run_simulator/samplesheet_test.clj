@@ -10,5 +10,8 @@
   (t/testing "Empty data with header"
     (t/is (= "[Header]" (samplesheet/serialize-key-value-section {} "[Header]"))))
   (t/testing "Data and header"
-    (t/is (= "[Header]\na,1\nb,2" (samplesheet/serialize-key-value-section {:a 1 :b 2} "[Header]")))))
+    (t/is (= "[Header]\na,1\nb,2" (samplesheet/serialize-key-value-section {:a 1 :b 2} "[Header]"))))
+  (t/testing "More realistic data and header"
+    (t/is (= "[Header]\nApplication,FASTQ Only\nWorkflow,GenerateFASTQ" (samplesheet/serialize-key-value-section {:Application "FASTQ Only" :Workflow "GenerateFASTQ"} "[Header]"))))
+  )
   
