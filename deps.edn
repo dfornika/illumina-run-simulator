@@ -6,4 +6,12 @@
  :aliases
  {:dev {}
   :build {:deps {io.github.clojure/tools.build {:tag "v0.8.2" :sha "ba1a2bf"}}
-          :ns-default build}}}
+          :ns-default build}
+  :test {:extra-paths ["test" "test/resources"]
+         :extra-deps {io.github.cognitect-labs/test-runner {:git/tag "v0.5.1" :git/sha "dfb30dd"}
+                      org.clojure/test.check {:mvn/version "1.1.1"}}
+         :main-opts ["-m" "cognitect.test-runner"]
+         :exec-fn cognitect.test-runner.api/test}
+  :test-dev {:extra-paths ["test" "test/resources"]
+             :extra-deps {io.github.cognitect-labs/test-runner {:git/tag "v0.5.1" :git/sha "dfb30dd"}
+                          org.clojure/test.check {:mvn/version "1.1.1"}}}}}

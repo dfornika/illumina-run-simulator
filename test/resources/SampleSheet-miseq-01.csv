@@ -1,0 +1,19 @@
+[Header]
+Experiment_Name,20220502-test
+Index_Adapters,IDT-Ilmn DNA-RNA UD Indexes SetA Tagmentation
+Investigator_Name,
+Instrument_Type,MiSeq
+Workflow,GenerateFASTQ
+IEMFileVersion,5
+Date,5/2/2022
+Application,FASTQ Only
+Assay,Illumina DNA Prep
+[Reads]
+151
+151
+[Settings]
+ReverseComplement,0
+Adapter,CTGTCTCTTATACACATCT
+[Data]
+Sample_ID,Sample_Name,Sample_Plate,Sample_Well,Index_Plate_Well,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project,Description
+R0123456789-100-A-A01,,,,A01,UDP001,GAACTGAGCG,UDP001,TCGTGGAGCG,test,
