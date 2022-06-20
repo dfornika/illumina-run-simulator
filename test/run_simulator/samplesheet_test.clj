@@ -1,5 +1,6 @@
 (ns run-simulator.samplesheet-test
-  (:require [run-simulator.samplesheet :as samplesheet]
+  (:require [clojure.java.io :as io]
+            [run-simulator.samplesheet :as samplesheet]
             [clojure.test :as t]
             [clojure.spec.test.alpha :as stest]))
 
@@ -14,4 +15,6 @@
   (t/testing "More realistic data and header"
     (t/is (= "[Header]\nApplication,FASTQ Only\nWorkflow,GenerateFASTQ" (samplesheet/serialize-key-value-section {:Application "FASTQ Only" :Workflow "GenerateFASTQ"} "[Header]"))))
   )
+
+
   
