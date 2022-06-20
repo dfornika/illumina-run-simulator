@@ -1,0 +1,23 @@
+{:Header {:IEMFileVersion "5"
+          :Investigator_Name ""
+          :Experiment_Name "20220502-test"
+          :Date "5/2/2022"
+          :Workflow "GenerateFASTQ"
+          :Application "FASTQ Only"
+          :Instrument_Type "MiSeq"
+          :Assay "Illumina DNA Prep"
+          :Index_Adapters "IDT-Ilmn DNA-RNA UD Indexes SetA Tagmentation"}
+ :Reads [151 151]
+ :Settings {:ReverseComplement "0"
+            :Adapter "CTGTCTCTTATACACATCT"}
+ :Data [{:Sample_ID "R0123456789-100-A-A01"
+         :Sample_Name ""
+         :Sample_Plate ""
+         :Sample_Well ""
+         :Index_Plate_Well "A01"
+         :I7_Index_ID "UDP001"
+         :index "GAACTGAGCG"
+         :I5_Index_ID "UDP001" 
+         :index2 "TCGTGGAGCG"
+         :Sample_Project "test"
+         :Description ""}]}
