@@ -1,36 +1,38 @@
 (ns run-simulator.generators
-  (:require [clojure.spec.gen.alpha :as gen]))
+  (:require [clojure.spec.alpha :as spec]
+            [clojure.spec.gen.alpha :as spec-gen]
+            [clojure.spec.test.alpha :as spec-test]))
 
 
 (def char-uppercase-alphanumeric
-  (gen/such-that #(or (Character/isUpperCase %) (Character/isDigit %)) (gen/char-alphanumeric)))
+  (spec-gen/such-that #(or (Character/isUpperCase %) (Character/isDigit %)) (spec-gen/char-alphanumeric)))
 
 
 (def char-uppercase-alphabetic
-  (gen/such-that #(Character/isUpperCase %) (gen/char-alphanumeric)))
+  (spec-gen/such-that #(Character/isUpperCase %) (spec-gen/char-alphanumeric)))
 
 
 (def miseq-flowcell-id
-  (gen/fmap #(apply str "000000000-" %) (gen/vector char-uppercase-alphanumeric 5)))
+  (spec-gen/fmap #(apply str "000000000-" %) (spec-gen/vector char-uppercase-alphanumeric 5)))
 
 
 (def nextseq-flowcell-id
-  (gen/fmap #(apply str "AAA" %) (gen/vector char-uppercase-alphanumeric 6)))
+  (spec-gen/fmap #(apply str "AAA" %) (spec-gen/vector char-uppercase-alphanumeric 6)))
 
 
 (defn make-zero-padded-num
   [min max digits]
   (let [zero-pad (fn [n] (format (str "%0" digits "d") n))]
-    (gen/fmap zero-pad (gen/choose min max))))
+    (spec-gen/fmap zero-pad (spec-gen/choose min max))))
 
 
 (def zero-padded-month
   (let [pad-zero #(if (> % 9) (str %) (str 0 %))]
-    (gen/fmap pad-zero (gen/choose 1 12))))
+    (spec-gen/fmap pad-zero (spec-gen/choose 1 12))))
 
 
 (def two-digit-year
-  (gen/fmap str (gen/choose 16 32)))
+  (spec-gen/fmap str (spec-gen/choose 16 32)))
 
 
 (def four-digit-date
@@ -46,58 +48,71 @@
                   "10" 31
                   "11" 30
                   "12" 31}]
-    (gen/bind zero-padded-month (fn [month] (gen/fmap #(str month %) (make-zero-padded-num 1 (num-days month) 2))))))
+    (spec-gen/bind zero-padded-month (fn [month] (spec-gen/fmap #(str month %) (make-zero-padded-num 1 (num-days month) 2))))))
 
 
 (def six-digit-date
-  (gen/bind two-digit-year
-            (fn [year] (gen/fmap #(str year %) four-digit-date))))
+  (spec-gen/bind two-digit-year
+            (fn [year] (spec-gen/fmap #(str year %) four-digit-date))))
 
 
 (def six-digit-timestamp
   (-> (make-zero-padded-num 0 24 2)
-      (gen/bind (fn [x] (gen/fmap #(str x %) (make-zero-padded-num 0 60 2))))
-      (gen/bind (fn [x] (gen/fmap #(str x %) (make-zero-padded-num 0 60 2))))))
+      (spec-gen/bind (fn [x] (spec-gen/fmap #(str x %) (make-zero-padded-num 0 60 2))))
+      (spec-gen/bind (fn [x] (spec-gen/fmap #(str x %) (make-zero-padded-num 0 60 2))))))
 
 
 (def miseq-instrument-id
-  (gen/fmap #(str "M" %) (make-zero-padded-num 1 9999 5)))
+  (spec-gen/fmap #(str "M" %) (make-zero-padded-num 1 9999 5)))
 
 
 (def nextseq-instrument-id
-  (gen/fmap #(str "VH" %) (make-zero-padded-num 1 999 5)))
+  (spec-gen/fmap #(str "VH" %) (make-zero-padded-num 1 999 5)))
 
 
 (def miseq-run-id
   (-> six-digit-date
-      (gen/bind (fn [x] (gen/fmap #(str x "_" %) miseq-instrument-id)))
-      (gen/bind (fn [x] (gen/fmap #(str x "_" %) (make-zero-padded-num 1 9999 4))))
-      (gen/bind (fn [x] (gen/fmap #(str x "_" %) miseq-flowcell-id)))))
+      (spec-gen/bind (fn [x] (spec-gen/fmap #(str x "_" %) miseq-instrument-id)))
+      (spec-gen/bind (fn [x] (spec-gen/fmap #(str x "_" %) (make-zero-padded-num 1 9999 4))))
+      (spec-gen/bind (fn [x] (spec-gen/fmap #(str x "_" %) miseq-flowcell-id)))))
+
+
+(def miseq-run-id-regex #"^[0-9]{6}_M[0-9]{5}_[0-9]{4}_000000000-[A-Z0-9]{5}$")
+
+
+(spec/def ::miseq-run-id (spec/and string? #(re-matches miseq-run-id-regex %)))
 
 
 (def nextseq-run-id
   (-> six-digit-date
-      (gen/bind (fn [x] (gen/fmap #(str x "_" %) nextseq-instrument-id)))
-      (gen/bind (fn [x] (gen/fmap #(str x "_" (str %)) (gen/choose 1 500))))
-      (gen/bind (fn [x] (gen/fmap #(str x "_" %) nextseq-flowcell-id)))))
+      (spec-gen/bind (fn [x] (spec-gen/fmap #(str x "_" %) nextseq-instrument-id)))
+      (spec-gen/bind (fn [x] (spec-gen/fmap #(str x "_" (str %)) (spec-gen/choose 1 500))))
+      (spec-gen/bind (fn [x] (spec-gen/fmap #(str x "_" %) nextseq-flowcell-id)))))
+
+
+(def nextseq-run-id-regex #"^[0-9]{6}_VH[0-9]{5}_[0-9]+_[A-Z0-9]{9}$")
+
+
+(spec/def ::nextseq-run-id (spec/and string? #(re-matches miseq-run-id-regex %)))
 
 
 (def library-id
-  (-> (gen/return "BC")
-      (gen/bind (fn [x] (gen/fmap #(str x %) two-digit-year)))
-      (gen/bind (fn [x] (gen/fmap #(str x %) char-uppercase-alphabetic)))
-      (gen/bind (fn [x] (gen/fmap #(str x (format "%03d" %)) (gen/choose 0 999))))
-      (gen/bind (fn [x] (gen/fmap #(str x %) char-uppercase-alphabetic)))))
+  (-> (spec-gen/return "BC")
+      (spec-gen/bind (fn [x] (spec-gen/fmap #(str x %) two-digit-year)))
+      (spec-gen/bind (fn [x] (spec-gen/fmap #(str x %) char-uppercase-alphabetic)))
+      (spec-gen/bind (fn [x] (spec-gen/fmap #(str x (format "%03d" %)) (spec-gen/choose 0 999))))
+      (spec-gen/bind (fn [x] (spec-gen/fmap #(str x %) char-uppercase-alphabetic)))))
+
 
 (def container-id
-  (-> (gen/return "R")
-      (gen/bind (fn [x] (gen/fmap #(str x (format "%010d" %)) (gen/choose 0 9999999999))))))
+  (-> (spec-gen/return "R")
+      (spec-gen/bind (fn [x] (spec-gen/fmap #(str x (format "%010d" %)) (spec-gen/choose 0 9999999999))))))
 
 
 (comment
-  (gen/sample miseq-run-id 10)
-  (gen/sample miseq-flowcell-id 1)
-  (gen/sample nextseq-run-id 10)
-  (gen/sample library-id 10)
-  (gen/sample container-id 1)
+  (spec-gen/sample miseq-run-id 10)
+  (spec-gen/sample miseq-flowcell-id 1)
+  (spec-gen/sample nextseq-run-id 10)
+  (spec-gen/sample library-id 10)
+  (spec-gen/sample container-id 1)
   )
