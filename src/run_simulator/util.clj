@@ -95,7 +95,9 @@
   ""
   [coll]
   (let [num-items (count coll)]
-    (nth coll (rand-int num-items))))
+    (if (> num-items 0)
+      (nth coll (rand-int num-items))
+      nil)))
 
 
 (defn int->well
