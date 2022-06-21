@@ -27,6 +27,7 @@
 
 (t/deftest now!-unit
   (t/testing "Timestamp matches regex"
+    (println (util/now!))
     (t/is (not (nil? (re-matches #"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+[+-]\d{2}:\d{2}" (util/now!))))))
   )
           
