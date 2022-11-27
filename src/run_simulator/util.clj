@@ -6,7 +6,8 @@
             [clojure.data.csv :as csv])
   (:import  [java.time.format DateTimeFormatter]
             [java.time ZonedDateTime]
-            [java.time LocalDate]))
+            [java.time LocalDate]
+            [java.nio ByteBuffer]))
 
 
 (defn csv-data->maps
@@ -108,6 +109,88 @@
         row (rows (quot n-mod-96 12))
         col (format "%02d" (inc (rem n-mod-96 12)))]
     (str row col)))
+
+
+(defn bytes->int
+  ""
+  [bs & [endianness]]
+  {:pre [(bytes? bs)]}
+  (let [endianness (if (= endianness :little-endian)
+                     java.nio.ByteOrder/LITTLE_ENDIAN
+                     java.nio.ByteOrder/BIG_ENDIAN)]
+    (-> bs
+        (ByteBuffer/wrap)
+        (.order endianness)
+        .getInt)))
+
+
+(defn bytes->float
+  ""
+  [bs & [endianness]]
+  {:pre [(bytes? bs)]}
+  (let [endianness (if (= endianness :little-endian)
+                     java.nio.ByteOrder/LITTLE_ENDIAN
+                     java.nio.ByteOrder/BIG_ENDIAN)]
+    (-> bs
+        (ByteBuffer/wrap)
+        (.order endianness)
+        .getFloat)))
+
+(defn float->bytes
+  ""
+  [n & [endianness]]
+  (let [bytes (ByteBuffer/allocate 4)
+        endianness (if (= endianness :little-endian)
+                     java.nio.ByteOrder/LITTLE_ENDIAN
+                     java.nio.ByteOrder/BIG_ENDIAN)]
+    (do
+      (.order    bytes endianness)
+      (.putFloat bytes n))
+    (.array bytes)))
+
+
+(defn byte->boolean
+  ""
+  [b]
+  (if (= 0x00 b)
+    false
+    true))
+
+
+(defn slurp-bytes
+  "
+  https://stackoverflow.com/a/26372677
+  "
+  [path]
+  (with-open [in (io/input-stream path)
+              out (java.io.ByteArrayOutputStream.)]
+    (io/copy in out)
+    (.toByteArray out)))
+
+
+(defn hexify-byte
+  "Convert byte to hex string
+  https://stackoverflow.com/a/15627016"
+  [b]
+  (let [hex [\0 \1 \2 \3 \4 \5 \6 \7 \8 \9 \a \b \c \d \e \f]
+        v (bit-and b 0xFF)]
+    (str (hex (bit-shift-right v 4)) (hex (bit-and v 0x0F)))))
+
+
+(defn hexify
+  "Convert byte sequence to hex string
+  https://stackoverflow.com/a/15627016
+  "
+  [coll]
+  (apply str (mapcat hexify-byte coll)))
+
+
+(defn unhexify "Convert hex string to byte sequence" [s] 
+  (letfn [(unhexify-2 [c1 c2] 
+            (unchecked-byte 
+             (+ (bit-shift-left (Character/digit c1 16) 4)
+                (Character/digit c2 16))))]
+    (map #(apply unhexify-2 %) (partition 2 s))))
 
 
 #_(spec/fdef int->well
