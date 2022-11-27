@@ -13,6 +13,13 @@
 (def clocs-num-bins-in-row (int (Math/ceil (/ clocs-image-width clocs-block-size))))
 
 
+
+(defn float->qseq
+  ""
+  [n]
+  (Math/round (+ (* n 10) 1000)))
+
+
 (defn num-clusters
   ""
   [locs-bytes]
@@ -38,9 +45,9 @@
         x-float (util/bytes->float x-bytes :little-endian)
         y-float (util/bytes->float y-bytes :little-endian)]
     {:x-float x-float
-     :x-qseq (Math/round (+ (* x-float 10) 1000))
+     :x-qseq (float->qseq x-float)
      :y-float y-float
-     :y-qseq (Math/round (+ (* y-float 10) 1000))}))
+     :y-qseq (float->qseq y-float)}))
 
 
 (defn coord->byteseq
@@ -50,9 +57,20 @@
         x-bytes (util/float->bytes x-float :little-endian)
         y-bytes (util/float->bytes y-float :little-endian)]
     (concat (into [] x-bytes) (into [] y-bytes))))
-    
-    
-  
+
+
+(defn random-coord
+  ""
+  [{:keys [min-x min-y max-x max-y]}]
+  (let [x-float (util/rand-between min-x max-x)
+        x-qseq (float->qseq x-float)
+        y-float (util/rand-between min-y max-y)
+        y-qseq (float->qseq y-float)]
+    {:x-float x-float
+     :x-qseq  x-qseq
+     :y-float y-float
+     :y-qseq  y-qseq}))
+ 
 
 (comment
 

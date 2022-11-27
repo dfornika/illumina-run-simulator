@@ -193,6 +193,12 @@
     (map #(apply unhexify-2 %) (partition 2 s))))
 
 
+(defn rand-between
+  ""
+  [a b]
+  (+ a (* (- b a) (rand))))
+
+
 #_(spec/fdef int->well
   :args (spec/cat :n int?)
   :ret (spec/and string?
