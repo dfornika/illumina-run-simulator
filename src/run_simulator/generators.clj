@@ -109,10 +109,43 @@
       (spec-gen/bind (fn [x] (spec-gen/fmap #(str x (format "%010d" %)) (spec-gen/choose 0 9999999999))))))
 
 
+(defn ordered-int-pair
+  "Create a pair of integers such that the second
+   is larger than the first, and both are between min and max."
+  [min max]
+  (let [x (+ min (rand-int max))
+        diff (- max x)
+        y (+ x (rand-int diff))]
+    [x y]))
+
+
+(spec/fdef ordered-int-pair
+  :args (spec/and (spec/cat :min int? :max int?)
+                  #(>= (:min %) 0)
+                  #(>= (:max %) 0)
+                  #(< (:min %) (:max %)))
+  :ret vector?
+  :fn (spec/and #(>= (first (:ret %)) (-> % :args :min))
+                #(<= (second (:ret %)) (-> % :args :max))
+                #(>= (second (:ret %)) (first (:ret %)))))
+
+(spec/def ::ordered-int-pair
+  (spec/and
+   (spec/cat :min pos-int? :max pos-int?)
+   #(< (:min %) (:max %))))
+
+
+(def xy-bounds
+  (-> (spec-gen/return {})
+      (spec-gen/bind (fn [x] (spec-gen/fmap #(assoc x :min-x (first %) :max-x (second %)) (spec/gen ::ordered-int-pair))))
+      (spec-gen/bind (fn [x] (spec-gen/fmap #(assoc x :min-y (first %) :max-y (second %)) (spec/gen ::ordered-int-pair))))))
+
+
 (comment
   (spec-gen/sample miseq-run-id 10)
   (spec-gen/sample miseq-flowcell-id 1)
   (spec-gen/sample nextseq-run-id 10)
   (spec-gen/sample library-id 10)
   (spec-gen/sample container-id 1)
+  (spec-gen/sample xy-bounds 10)
   )

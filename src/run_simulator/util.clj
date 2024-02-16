@@ -65,6 +65,17 @@
   []
   (.. (ZonedDateTime/now) (format DateTimeFormatter/ISO_OFFSET_DATE_TIME)))
 
+(defn now-utc!
+  "Generate an ISO-8601 timestamp (`YYYY-MM-DDTHH:mm:ss.xxxxZ`).
+   eg: `2022-02-11T14:13:49.9335Z`
+  
+   takes:
+   returns:
+     ISO-8601 timestamp for the current time (`String`)
+  "
+  []
+  (.. (ZonedDateTime/now) (format DateTimeFormatter/ISO_INSTANT)))
+
 
 (defn iso-date-str->date
   "
@@ -185,7 +196,9 @@
   (apply str (mapcat hexify-byte coll)))
 
 
-(defn unhexify "Convert hex string to byte sequence" [s] 
+(defn unhexify
+  "Convert hex string to byte sequence"
+  [s] 
   (letfn [(unhexify-2 [c1 c2] 
             (unchecked-byte 
              (+ (bit-shift-left (Character/digit c1 16) 4)

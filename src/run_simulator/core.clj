@@ -15,10 +15,11 @@
 
 
 (defn generate-run-id
+  "Generate a sequencing run ID"
   [date-str instrument-id run-num instrument-type]
   (let [six-digit-date (apply str (drop 2 (str/replace date-str "-" "")))
         run-id (case instrument-type
-                 :miseq (first (spec-gen/sample generators/miseq-flowcell-id 1))
+                 :miseq   (first (spec-gen/sample generators/miseq-flowcell-id 1))
                  :nextseq (first (spec-gen/sample generators/nextseq-flowcell-id 1)))]
     (str/join "_" [six-digit-date
                    instrument-id
@@ -27,7 +28,7 @@
 
 
 (defn generate-sample-id
-  ""
+  "Generate a sample ID"
   [plate-num index]
   (str/join "-" [(first (spec-gen/sample generators/container-id 1))
                  plate-num
