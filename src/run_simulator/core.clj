@@ -7,7 +7,8 @@
             [run-simulator.cli :as cli]
             [run-simulator.util :as util]
             [run-simulator.generators :as generators]
-            [run-simulator.samplesheet :as samplesheet])
+            [run-simulator.samplesheet :as samplesheet]
+            [run-simulator.runparameters :as runparameters])
   (:gen-class))
 
 
@@ -111,8 +112,11 @@
         runparameters-template (case instrument-type
                                :miseq (util/load-edn! (io/resource "runparameters-template-miseq.edn"))
                                :nextseq (util/load-edn! (io/resource "runparameters-template-nextseq.edn")))
+        runparameters-data (case instrument-type
+                             :miseq runparameters-template    ;; TODO
+                             :nextseq runparameters-template) ;; Replace template values with simulated values
         runparameters-file (io/file run-output-dir "RunParameters.xml")
-        runparameters-string "<RunParameters>\n</RunParameters>\n" ;; TODO: generate RunParameters.xml file
+        runparameters-string (runparameters/serialize-map-to-xml runparameters-data)
         fastq-subdir (io/file run-output-dir (case instrument-type
                                                :miseq (miseq-fastq-subdir (:output-dir-structure instrument) db)
                                                :nextseq "Analysis/1/Data/fastq"))

@@ -1,21 +1,28 @@
 (ns run-simulator.runparameters
   (:require [clojure.java.io :as io]
             [clojure.data.xml :as xml]
+            [clojure.walk :refer [postwalk]]
             [run-simulator.util :as util]))
 
-(def versions-miseq
-  {:FPGAVersion "9.5.12"
-   :MCSVersion "2.6.2.1"
-   :RTAVersion "1.18.54"})
 
 
-(defn serialize-runparameters-miseq
-  [runparameters])
+(defn make-xml-node
+  "
+   credit to: https://stackoverflow.com/a/56019931
+  "
+  [[k v]]
+  (if (map? v)
+    (xml/element k {} (map make-xml-node (seq v)))
+    (xml/element k {} v)))
 
 
-(defn serialize-runparameters-nextseq
-  [runparameters]
-  )
+(defn serialize-map-to-xml
+  ""
+  [m]
+  (->> m
+       (map make-xml-node)
+       xml/indent-str))
+
 
 
 (comment
@@ -24,13 +31,15 @@
 
   (def runparameters-data-miseq
     (let [template runparameters-template-miseq]
-      template))
+      (-> template
+          (assoc-in [:RunParameters :FlowcellRFIDTag :SerialNumber] "000000000-GA63B"))))
 
   (def runparameters-data-nextseq
     (let [template runparameters-template-nextseq]
-      template))
-  
-  (print (xml/indent-str (xml/sexp-as-element runparameters-data-nextseq)))
+      (-> template
+          identity)))
 
-
+  (serialize-map-to-xml runparameters-data-miseq)
+  (serialize-map-to-xml runparameters-data-nextseq)
+  (serialize-map-to-xml {:a  {:b 2 :c {:d 3 :e 4}}})
   )

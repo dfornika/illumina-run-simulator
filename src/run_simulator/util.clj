@@ -3,7 +3,8 @@
             [clojure.edn :as edn]
             [clojure.string :as str]
             [clojure.data.json :as json]
-            [clojure.data.csv :as csv])
+            [clojure.data.csv :as csv]
+            [clojure.walk :refer [postwalk]])
   (:import  [java.time.format DateTimeFormatter]
             [java.time ZonedDateTime]
             [java.time LocalDate]
@@ -122,6 +123,13 @@
     (str row col)))
 
 
+#_(spec/fdef int->well
+  :args (spec/cat :n int?)
+  :ret (spec/and string?
+                 #(contains? #{\A \B \C \D \E \F \G \H} (first %))
+                 #(= 3 (count %))))
+
+
 (defn bytes->int
   ""
   [bs & [endianness]]
@@ -212,8 +220,4 @@
   (+ a (* (- b a) (rand))))
 
 
-#_(spec/fdef int->well
-  :args (spec/cat :n int?)
-  :ret (spec/and string?
-                 #(contains? #{\A \B \C \D \E \F \G \H} (first %))
-                 #(= 3 (count %))))
+

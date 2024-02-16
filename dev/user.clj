@@ -1,5 +1,7 @@
 (ns user
-  (:require [run-simulator.util :as util]
+  (:require [clojure.pprint :refer [pprint]]
+            [clojure.walk :refer [postwalk]]
+            [run-simulator.util :as util]
             [run-simulator.core :as core]))
 
 (defonce db (atom {}))
@@ -16,6 +18,7 @@
       (swap! db assoc :current-date (util/iso-date-str->date (get-in @db [:config :starting-date])))
       (swap! db assoc :current-plate-number (get-in @db [:config :starting-plate-number])))))
 
+
 (comment
   
   (reset! db {})
@@ -23,5 +26,7 @@
   (setup)
 
   (core/simulate-run! db)
+  
+
   )
 
