@@ -92,18 +92,35 @@
         instrument-type (:instrument-type instrument)
         run-id (generate-run-id current-date instrument-id run-num instrument-type)
         run-output-dir (io/file (:output-dir instrument) run-id)
-        indexes-file (case instrument-type :miseq (io/resource "indexes-miseq.csv") :nextseq (io/resource "indexes-nextseq.csv"))
+        indexes-file (case instrument-type
+                       :miseq (io/resource "indexes-miseq.csv")
+                       :nextseq (io/resource "indexes-nextseq.csv"))
         indexes (util/load-csv! indexes-file)
         num-samples (rand-int (count indexes))
         samples (map #(generate-sample (:current-plate-number @db) instrument-type % db) (take num-samples indexes))
-        samplesheet-template (case instrument-type :miseq (util/load-edn! (io/resource "samplesheet-template-miseq.edn")) :nextseq (util/load-edn! (io/resource "samplesheet-template-nextseq.edn")))
-        samplesheet-data (case instrument-type :miseq (assoc samplesheet-template :Data samples) :nextseq (assoc samplesheet-template :BCLConvert_Data samples :Cloud_Data samples))
-        samplesheet-string (case instrument-type :miseq (samplesheet/serialize-miseq-samplesheet samplesheet-data) :nextseq (samplesheet/serialize-nextseq-samplesheet samplesheet-data))
+        samplesheet-template (case instrument-type
+                               :miseq (util/load-edn! (io/resource "samplesheet-template-miseq.edn"))
+                               :nextseq (util/load-edn! (io/resource "samplesheet-template-nextseq.edn")))
+        samplesheet-data (case instrument-type
+                           :miseq (assoc samplesheet-template :Data samples)
+                           :nextseq (assoc samplesheet-template :BCLConvert_Data samples :Cloud_Data samples))
+        samplesheet-string (case instrument-type
+                             :miseq (samplesheet/serialize-miseq-samplesheet samplesheet-data)
+                             :nextseq (samplesheet/serialize-nextseq-samplesheet samplesheet-data))
         samplesheet-file (io/file run-output-dir "SampleSheet.csv")
-        fastq-subdir (io/file run-output-dir (case instrument-type :miseq (miseq-fastq-subdir (:output-dir-structure instrument) db) :nextseq "Analysis/1/Data/fastq"))
+        runparameters-template (case instrument-type
+                               :miseq (util/load-edn! (io/resource "runparameters-template-miseq.edn"))
+                               :nextseq (util/load-edn! (io/resource "runparameters-template-nextseq.edn")))
+        runparameters-file (io/file run-output-dir "RunParameters.xml")
+        runparameters-string "<RunParameters>\n</RunParameters>\n" ;; TODO: generate RunParameters.xml file
+        fastq-subdir (io/file run-output-dir (case instrument-type
+                                               :miseq (miseq-fastq-subdir (:output-dir-structure instrument) db)
+                                               :nextseq "Analysis/1/Data/fastq"))
         upload-complete-file (io/file run-output-dir "upload_complete.json")]
     (.mkdirs run-output-dir)
     (util/log! {:timestamp (util/now!) :event "created_run_output_dir" :run-id run-id :run-output-dir (str run-output-dir)})
+    (spit runparameters-file runparameters-string)
+    (util/log! {:timestamp (util/now!) :event "created_runparameters_file" :run-id run-id :runparameters-file (str runparameters-file)})
     (util/log! {:timestamp (util/now!) :event "created_samples" :run-id run-id :num-samples (count samples)})
     (spit samplesheet-file samplesheet-string)
     (util/log! {:timestamp (util/now!) :event "created_samplesheet_file" :run-id run-id :samplesheet-file (str samplesheet-file)})

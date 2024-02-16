@@ -12,7 +12,8 @@
 
 
 (defn serialize-miseq-samplesheet
-  ""
+  "Take samplesheet data and convert to a string in
+   SampleSheet.csv format for MiSeq"
   [samplesheet]
   (let [header (serialize-key-value-section (:Header samplesheet) "[Header]")
         reads (str/join "\n" (conj (seq (:Reads samplesheet)) "[Reads]"))
@@ -27,7 +28,8 @@
 
 
 (defn serialize-nextseq-samplesheet
-  ""
+  "Take samplesheet data and convert to a string in
+   SampleSheet.csv format for a NextSeq"
   [samplesheet]
   (let [header (serialize-key-value-section (:Header samplesheet) "[Header]")
         reads (serialize-key-value-section (:Reads samplesheet) "[Reads]")

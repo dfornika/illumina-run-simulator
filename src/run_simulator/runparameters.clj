@@ -1,5 +1,7 @@
 (ns run-simulator.runparameters
-  (:require [clojure.data.xml :as xml]))
+  (:require [clojure.java.io :as io]
+            [clojure.data.xml :as xml]
+            [run-simulator.util :as util]))
 
 (def versions-miseq
   {:FPGAVersion "9.5.12"
@@ -7,27 +9,28 @@
    :RTAVersion "1.18.54"})
 
 
+(defn serialize-runparameters-miseq
+  [runparameters])
+
+
+(defn serialize-runparameters-nextseq
+  [runparameters]
+  )
+
 
 (comment
-  (def runparameters-data-miseq
-    [:RunParameters
-     [:EnableCloud "false"]
-     [:CopyManifests "true"]
-     [:FlowcellRFIDTag
-      [:SerialNumber "000000000-G8B4M"]
-      [:PartNumber 15035218]
-      [:ExpirationDate "2023-08-08T00:00:00"]]
-     [:PR2BottleRFIDTag
-      [:SerialNumber "MS3440523-00PR2"]
-      [:PartNumber 15041807]
-      [:ExpirationDate "2023-08-30T00:00:00"]]
-    [:ReagentKitRFIDTag
-     [:SerialNumber "MS3366888-300V2"]
-     [:PartNumber 15033572]
-     [:ExpirationDate "2023-05-15T00:00:00"]]
-     ])
+  (def runparameters-template-miseq (util/load-edn! (io/resource "runparameters-template-miseq.edn")))
+  (def runparameters-template-nextseq (util/load-edn! (io/resource "runparameters-template-nextseq.edn")))
 
-  (print (xml/indent-str (xml/sexp-as-element runparameters-data-miseq)))
+  (def runparameters-data-miseq
+    (let [template runparameters-template-miseq]
+      template))
+
+  (def runparameters-data-nextseq
+    (let [template runparameters-template-nextseq]
+      template))
+  
+  (print (xml/indent-str (xml/sexp-as-element runparameters-data-nextseq)))
 
 
   )
