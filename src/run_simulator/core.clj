@@ -135,7 +135,8 @@
                                                :miseq (miseq-fastq-subdir (:output-dir-structure instrument) db)
                                                :nextseq "Analysis/1/Data/fastq"
                                                :i100 "Analysis/1/Data/BCLConvert/fastq"))
-        upload-complete-file (io/file run-output-dir "upload_complete.json")]
+        upload-complete-file (io/file run-output-dir "upload_complete.json")
+        qc-check-complete-file (io/file run-output-dir "qc_check_complete.json")]
     
     (.mkdirs run-output-dir)
     (util/log! {:timestamp (util/now!)
@@ -181,6 +182,13 @@
                   :event "created_upload_complete_file"
                   :run-id run-id
                   :upload-complete-file (str upload-complete-file)}))
+
+    (when (get-in @db [:config :mark-qc-check-complete])
+      (.createNewFile qc-check-complete-file)
+      (util/log! {:timestamp (util/now!)
+                  :event "created_qc_check_complete_file"
+                  :run-id run-id
+                  :qc-check-complete-file (str qc-check-complete-file)}))
     
     (swap! db update-in [:current-run-num-by-instrument-id instrument-id] inc)
     
