@@ -115,3 +115,8 @@
   :ret (spec/and string?
                  #(contains? #{\A \B \C \D \E \F \G \H} (first %))
                  #(= 3 (count %))))
+
+(defn rand-int-range
+  "Random int between min (inclusive) and max (exclusive)"
+  [min max]
+  (+ min (rand-int (- max min))))
