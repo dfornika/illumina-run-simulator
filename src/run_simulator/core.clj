@@ -102,8 +102,12 @@
         instrument (util/randomly-select available-instruments)
         instrument-id (:instrument-id instrument)
         run-num (get-in @db [:current-run-num-by-instrument-id instrument-id])
+        padded-run-num (case instrument-type
+                         :miseq (format "%04d" run-num)
+                         :nextseq (format "%d" run-num)
+                         :i100 (format "%04d" run-num))
         instrument-type (:instrument-type instrument)
-        run-id (generate-run-id current-date instrument-id run-num instrument-type)
+        run-id (generate-run-id current-date instrument-id padded-run-num instrument-type)
         run-output-dir (io/file (:output-dir instrument) run-id)
         indexes-file (case instrument-type
                        :miseq (io/resource "indexes-miseq.csv")

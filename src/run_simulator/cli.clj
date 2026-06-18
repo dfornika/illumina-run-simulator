@@ -2,7 +2,7 @@
   (:require [clojure.java.io :as io]
             [clojure.string :as str]))
 
-(def version "v0.2.0")
+(def version "v0.2.1")
 
 (defn usage
   ""
