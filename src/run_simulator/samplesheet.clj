@@ -46,3 +46,8 @@
                     cloud-settings
                     cloud-data
                     ""])))
+
+(defn serialize-i100-samplesheet
+  ""
+  [samplesheet]
+  (serialize-nextseq-samplesheet samplesheet))

@@ -19,6 +19,8 @@
 (def nextseq-flowcell-id
   (spec-gen/fmap #(apply str "AAA" %) (spec-gen/vector char-uppercase-alphanumeric 6)))
 
+(def i100-flowcell-id
+  (spec-gen/fmap #(str (apply str "ASC" %) "-SC3") (spec-gen/vector char-uppercase-alphanumeric 6)))
 
 (defn make-zero-padded-num
   [min max digits]
@@ -30,9 +32,11 @@
   (let [pad-zero #(if (> % 9) (str %) (str 0 %))]
     (spec-gen/fmap pad-zero (spec-gen/choose 1 12))))
 
-
 (def two-digit-year
   (spec-gen/fmap str (spec-gen/choose 16 32)))
+
+(def four-digit-year
+  (spec-gen/fmap str (spec-gen/choose 2016 2032)))
 
 
 (def four-digit-date
@@ -53,7 +57,11 @@
 
 (def six-digit-date
   (spec-gen/bind two-digit-year
-            (fn [year] (spec-gen/fmap #(str year %) four-digit-date))))
+                 (fn [year] (spec-gen/fmap #(str year %) four-digit-date))))
+
+(def eight-digit-date
+  (spec-gen/bind four-digit-year
+                 (fn [year] (spec-gen/fmap #(str year %) four-digit-date))))
 
 
 (def six-digit-timestamp
@@ -68,6 +76,9 @@
 
 (def nextseq-instrument-id
   (spec-gen/fmap #(str "VH" %) (make-zero-padded-num 1 999 5)))
+
+(def i100-instrument-id
+  (spec-gen/fmap #(str "SH" %) (make-zero-padded-num 1 999 5)))
 
 
 (def miseq-run-id
@@ -93,8 +104,19 @@
 (def nextseq-run-id-regex #"^[0-9]{6}_VH[0-9]{5}_[0-9]+_[A-Z0-9]{9}$")
 
 
-(spec/def ::nextseq-run-id (spec/and string? #(re-matches miseq-run-id-regex %)))
+(spec/def ::nextseq-run-id (spec/and string? #(re-matches nextseq-run-id-regex %)))
 
+(def i100-run-id
+  (-> eight-digit-date
+      (spec-gen/bind (fn [x] (spec-gen/fmap #(str x "_" %) i100-instrument-id)))
+      (spec-gen/bind (fn [x] (spec-gen/fmap #(str x "_" (str %)) (spec-gen/choose 1 500))))
+      (spec-gen/bind (fn [x] (spec-gen/fmap #(str x "_" %) i100-flowcell-id)))))
+
+
+
+(def i100-run-id-regex #"^[0-9]{8}_SH[0-9]{5}_[0-9]{4}_[A-Z0-9]{10}-SC3$")
+
+(spec/def ::i100-run-id (spec/and string? #(re-matches i100-run-id-regex %)))
 
 (def library-id
   (-> (spec-gen/return "BC")
@@ -113,6 +135,7 @@
   (spec-gen/sample miseq-run-id 10)
   (spec-gen/sample miseq-flowcell-id 1)
   (spec-gen/sample nextseq-run-id 10)
+  (spec-gen/sample i100-run-id 10)
   (spec-gen/sample library-id 10)
   (spec-gen/sample container-id 1)
   )
