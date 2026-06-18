@@ -14,7 +14,7 @@
 
 (comment
 
-  (let [config (util/load-edn! "symlink-seqs-config.edn")]
+  (let [config (util/load-edn! "dev-config.edn")]
     (swap! db assoc :config config)
     (swap! db assoc :current-run-num-by-instrument-id
            (into {} (map (juxt :instrument-id :starting-run-number) (get-in @db [:config :instruments]))))
