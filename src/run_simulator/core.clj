@@ -99,7 +99,6 @@
         available-instruments (if instrument-type
                                 (filter #(= instrument-type (:instrument-type %)) available-instruments)
                                 available-instruments)
-        _ (util/log! {:available-instruments available-instruments})
         instrument (util/randomly-select available-instruments)
         instrument-id (:instrument-id instrument)
         instrument-type (:instrument-type instrument)
