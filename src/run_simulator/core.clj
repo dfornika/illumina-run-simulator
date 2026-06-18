@@ -8,7 +8,8 @@
             [run-simulator.util :as util]
             [run-simulator.generators :as generators]
             [run-simulator.samplesheet :as samplesheet]
-            [run-simulator.runparameters :as runparameters])
+            [run-simulator.runparameters :as runparameters]
+            [run-simulator.runcompletionstatus :as runcompletionstatus])
   (:gen-class))
 
 
@@ -110,13 +111,21 @@
                              :nextseq (samplesheet/serialize-nextseq-samplesheet samplesheet-data))
         samplesheet-file (io/file run-output-dir "SampleSheet.csv")
         runparameters-template (case instrument-type
-                               :miseq (util/load-edn! (io/resource "runparameters-template-miseq.edn"))
-                               :nextseq (util/load-edn! (io/resource "runparameters-template-nextseq.edn")))
+                                 :miseq (util/load-edn! (io/resource "runparameters-template-miseq.edn"))
+                                 :nextseq (util/load-edn! (io/resource "runparameters-template-nextseq.edn")))
         runparameters-data (case instrument-type
                              :miseq runparameters-template    ;; TODO
                              :nextseq runparameters-template) ;; Replace template values with simulated values
         runparameters-file (io/file run-output-dir "RunParameters.xml")
         runparameters-string (runparameters/serialize-map-to-xml runparameters-data)
+        runcompletionstatus-template (case instrument-type
+                                       :miseq (util/load-edn! (io/resource "runcompletionstatus-template-miseq.edn"))
+                                       :nextseq (util/load-edn! (io/resource "runcompletionstatus-template-nextseq.edn")))
+        runcompletionstatus-data (case instrument-type
+                                   :miseq runcompletionstatus-template    ;; TODO
+                                   :nextseq runcompletionstatus-template) ;; Replace template values with simulated values
+        runcompletionstatus-file (io/file run-output-dir "RunCompletionStatus.xml")
+        runcompletionstatus-string (runcompletionstatus/serialize-map-to-xml runcompletionstatus-data)
         fastq-subdir (io/file run-output-dir (case instrument-type
                                                :miseq (miseq-fastq-subdir (:output-dir-structure instrument) db)
                                                :nextseq "Analysis/1/Data/fastq"))
@@ -125,6 +134,8 @@
     (util/log! {:timestamp (util/now!) :event "created_run_output_dir" :run-id run-id :run-output-dir (str run-output-dir)})
     (spit runparameters-file runparameters-string)
     (util/log! {:timestamp (util/now!) :event "created_runparameters_file" :run-id run-id :runparameters-file (str runparameters-file)})
+    (spit runcompletionstatus-file runcompletionstatus-string)
+    (util/log! {:timestamp (util/now!) :event "created_runcompletionstatus_file" :run-id run-id :runcompletionstatus-file (str runcompletionstatus-file)})
     (util/log! {:timestamp (util/now!) :event "created_samples" :run-id run-id :num-samples (count samples)})
     (spit samplesheet-file samplesheet-string)
     (util/log! {:timestamp (util/now!) :event "created_samplesheet_file" :run-id run-id :samplesheet-file (str samplesheet-file)})

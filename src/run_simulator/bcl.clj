@@ -36,7 +36,7 @@
   ""
   [bcl-bytes]
   (let [num-clusters-bytes (take 4 bcl-bytes)]
-    (util/bytes->int (byte-array num-clusters-bytes) :little-endian)))
+    (util/bytes->long (byte-array num-clusters-bytes) :little-endian)))
 
 (comment
     (def test-bcl-path "test/resources/picard_bcl_passing.bcl")

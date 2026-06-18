@@ -130,8 +130,8 @@
                  #(= 3 (count %))))
 
 
-(defn bytes->int
-  ""
+(defn bytes->long
+  "Take an array of bytes"
   [bs & [endianness]]
   {:pre [(bytes? bs)]}
   (let [endianness (if (= endianness :little-endian)
@@ -140,8 +140,21 @@
     (-> bs
         (ByteBuffer/wrap)
         (.order endianness)
-        .getInt)))
+        .getLong)))
 
+(defn long->bytes
+  ""
+  [n & [endianness]]
+  (let [bytes (ByteBuffer/allocate 8)
+        endianness (if (= endianness :little-endian)
+                     java.nio.ByteOrder/LITTLE_ENDIAN
+                     java.nio.ByteOrder/BIG_ENDIAN)]
+
+    (do
+      (.order bytes endianness)
+      (.putLong bytes n))
+    (.array bytes)))
+    
 
 (defn bytes->float
   ""

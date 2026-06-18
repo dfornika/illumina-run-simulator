@@ -25,7 +25,7 @@
   [locs-bytes]
   (let [locs-header (take locs-header-size locs-bytes)
         num-clusters-bytes (byte-array (drop 8 locs-header))]
-    (util/bytes->int num-clusters-bytes :little-endian)))
+    (util/bytes->long num-clusters-bytes :little-endian)))
 
 
 (defn byteseq->coord 
