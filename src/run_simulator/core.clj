@@ -101,12 +101,12 @@
                                 available-instruments)
         instrument (util/randomly-select available-instruments)
         instrument-id (:instrument-id instrument)
+        instrument-type (:instrument-type instrument)
         run-num (get-in @db [:current-run-num-by-instrument-id instrument-id])
         padded-run-num (case instrument-type
                          :miseq (format "%04d" run-num)
                          :nextseq (format "%d" run-num)
                          :i100 (format "%04d" run-num))
-        instrument-type (:instrument-type instrument)
         run-id (generate-run-id current-date instrument-id padded-run-num instrument-type)
         run-output-dir (io/file (:output-dir instrument) run-id)
         indexes-file (case instrument-type
@@ -237,7 +237,7 @@
   (loop []
     (simulate-run! db)
     (Thread/sleep (get-in @db [:config :run-interval-ms]))
-    (swap! db update :current-date #(.plusDays % 1))
+    (swap! db update :current-date #(.plusDays % (util/rand-int-range 1 10)))
     (recur)))
 
 

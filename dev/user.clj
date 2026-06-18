@@ -21,6 +21,7 @@
     (swap! db assoc :current-date (util/iso-date-str->date (get-in @db [:config :starting-date])))
     (swap! db assoc :current-plate-number (get-in @db [:config :starting-plate-number])))
 
+  (core/simulate-run! db)
   (core/simulate-run! db {:instrument-type :i100})
   (core/simulate-run! db {:instrument-type :miseq})
   (core/simulate-run! db {:instrument-type :nextseq})
