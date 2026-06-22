@@ -153,6 +153,21 @@
   (gen/fmap #(str "R" (format "%010d" %)) (gen/choose 0 9999999999)))
 
 
+(def ordered-nat-pair
+  (let [nat (gen/large-integer* {:min 0 :max (quot Long/MAX_VALUE 2)})]
+    (gen/bind nat
+              (fn [lo]
+                (gen/fmap (fn [hi] [lo hi])
+                          (gen/fmap #(+ lo %) nat))))))
+
+
+(def xy-bounds
+  (gen/fmap (fn [[[min-x max-x] [min-y max-y]]]
+              {:min-x min-x :max-x max-x
+               :min-y min-y :max-y max-y})
+            (gen/tuple ordered-nat-pair ordered-nat-pair)))
+
+
 (comment
   (gen/sample miseq-run-id 10)
   (gen/sample miseq-flowcell-id 1)

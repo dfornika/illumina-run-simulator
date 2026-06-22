@@ -6,7 +6,8 @@
             [clojure.data.csv :as csv])
   (:import  [java.time.format DateTimeFormatter]
             [java.time ZonedDateTime]
-            [java.time LocalDate]))
+            [java.time LocalDate]
+            [java.nio ByteBuffer]))
 
 
 (defn csv-data->maps
@@ -39,7 +40,7 @@
 
 
 (defn maps->csv-str
-  ""
+  "Serialize maps to a CSV string using the given header keywords."
   [maps headers]
   (->> maps
        (#(maps->csv-data % headers))
@@ -48,7 +49,7 @@
 
 
 (defn log!
-  ""
+  "Print a map as a JSON log line, converting hyphenated keys to underscores."
   [m]
   (println (json/write-str m :key-fn #(str/replace (name %) "-" "_") :escape-slash false)))
 
@@ -65,9 +66,14 @@
   (.. (ZonedDateTime/now) (format DateTimeFormatter/ISO_OFFSET_DATE_TIME)))
 
 
+(defn now-utc!
+  "Generate an ISO-8601 UTC instant timestamp."
+  []
+  (.. (ZonedDateTime/now) (format DateTimeFormatter/ISO_INSTANT)))
+
+
 (defn iso-date-str->date
-  "
-  "
+  "Parse an ISO date string (YYYY-MM-DD) into a LocalDate."
   [iso-date-str]
   (LocalDate/parse iso-date-str))
 
@@ -92,7 +98,7 @@
 
 
 (defn randomly-select
-  ""
+  "Return a random element from coll, or nil if empty."
   [coll]
   (let [num-items (count coll)]
     (if (> num-items 0)
@@ -120,3 +126,98 @@
   "Random int between min (inclusive) and max (exclusive)"
   [min max]
   (+ min (rand-int (- max min))))
+
+
+(defn rand-between
+  "Return a random double uniformly distributed between a and b."
+  [a b]
+  (+ a (* (- b a) (rand))))
+
+
+(defn bytes->long
+  "Convert a byte array to a long. Endianness defaults to big-endian; pass :little-endian to override."
+  [bs & [endianness]]
+  {:pre [(bytes? bs)]}
+  (let [endianness (if (= endianness :little-endian)
+                     java.nio.ByteOrder/LITTLE_ENDIAN
+                     java.nio.ByteOrder/BIG_ENDIAN)]
+    (-> bs
+        (ByteBuffer/wrap)
+        (.order endianness)
+        .getLong)))
+
+
+(defn long->bytes
+  "Convert a long to an 8-byte array. Endianness defaults to big-endian; pass :little-endian to override."
+  [n & [endianness]]
+  (let [buf (ByteBuffer/allocate 8)
+        endianness (if (= endianness :little-endian)
+                     java.nio.ByteOrder/LITTLE_ENDIAN
+                     java.nio.ByteOrder/BIG_ENDIAN)]
+    (.order buf endianness)
+    (.putLong buf n)
+    (.array buf)))
+
+
+(defn bytes->float
+  "Convert a byte array to a float. Endianness defaults to big-endian; pass :little-endian to override."
+  [bs & [endianness]]
+  {:pre [(bytes? bs)]}
+  (let [endianness (if (= endianness :little-endian)
+                     java.nio.ByteOrder/LITTLE_ENDIAN
+                     java.nio.ByteOrder/BIG_ENDIAN)]
+    (-> bs
+        (ByteBuffer/wrap)
+        (.order endianness)
+        .getFloat)))
+
+
+(defn float->bytes
+  "Convert a float to a 4-byte array. Endianness defaults to big-endian; pass :little-endian to override."
+  [n & [endianness]]
+  (let [buf (ByteBuffer/allocate 4)
+        endianness (if (= endianness :little-endian)
+                     java.nio.ByteOrder/LITTLE_ENDIAN
+                     java.nio.ByteOrder/BIG_ENDIAN)]
+    (.order buf endianness)
+    (.putFloat buf n)
+    (.array buf)))
+
+
+(defn byte->boolean
+  "Convert a byte to boolean: true if non-zero."
+  [b]
+  (not (= 0x00 b)))
+
+
+(defn slurp-bytes
+  "Read an entire file as a byte array."
+  [path]
+  (with-open [in (io/input-stream path)
+              out (java.io.ByteArrayOutputStream.)]
+    (io/copy in out)
+    (.toByteArray out)))
+
+
+(defn hexify-byte
+  "Convert a single byte to its two-character hex representation."
+  [b]
+  (let [hex [\0 \1 \2 \3 \4 \5 \6 \7 \8 \9 \a \b \c \d \e \f]
+        v (bit-and b 0xFF)]
+    (str (hex (bit-shift-right v 4)) (hex (bit-and v 0x0F)))))
+
+
+(defn hexify
+  "Convert a collection of bytes to a hex string."
+  [coll]
+  (apply str (mapcat hexify-byte coll)))
+
+
+(defn unhexify
+  "Convert a hex string to a sequence of bytes."
+  [s]
+  (letfn [(unhexify-2 [c1 c2]
+            (unchecked-byte
+             (+ (bit-shift-left (Character/digit c1 16) 4)
+                (Character/digit c2 16))))]
+    (map #(apply unhexify-2 %) (partition 2 s))))

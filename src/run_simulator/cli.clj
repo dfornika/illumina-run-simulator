@@ -5,7 +5,7 @@
 (def version "v0.2.3")
 
 (defn usage
-  ""
+  "Build the CLI usage/help string from the options summary."
   [options-summary]
   (->> [(str/join " " ["run-simulator" version])
         ""

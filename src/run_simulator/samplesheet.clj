@@ -12,7 +12,7 @@
 
 
 (defn serialize-miseq-samplesheet
-  ""
+  "Serialize a MiSeq samplesheet map to CSV string with Header, Reads, Settings, and Data sections."
   [samplesheet]
   (let [header (serialize-key-value-section (:Header samplesheet) "[Header]")
         reads (str/join "\n" (conj (seq (:Reads samplesheet)) "[Reads]"))
@@ -27,7 +27,7 @@
 
 
 (defn serialize-nextseq-samplesheet
-  ""
+  "Serialize a NextSeq samplesheet map to CSV string with Header, Reads, BCLConvert, and Cloud sections."
   [samplesheet]
   (let [header (serialize-key-value-section (:Header samplesheet) "[Header]")
         reads (serialize-key-value-section (:Reads samplesheet) "[Reads]")
@@ -48,6 +48,6 @@
                     ""])))
 
 (defn serialize-i100-samplesheet
-  ""
+  "Serialize an iSeq 100 samplesheet map to CSV string (delegates to NextSeq format)."
   [samplesheet]
   (serialize-nextseq-samplesheet samplesheet))
