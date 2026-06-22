@@ -4,6 +4,7 @@
             [clojure.tools.cli :refer [parse-opts]]
             [clojure.spec.alpha :as spec]
             [clojure.spec.gen.alpha :as gen]
+            [taoensso.telemere :as tel]
             [run-simulator.cli :as cli]
             [run-simulator.util :as util]
             [run-simulator.generators :as generators]
@@ -203,30 +204,22 @@
            fastq-subdir fastq-params reference-seqs
            mark-upload-complete mark-qc-check-complete]}]
   (.mkdirs run-output-dir)
-  (util/log! {:timestamp (util/now!)
-              :event "created_run_output_dir"
-              :run-id run-id
-              :run-output-dir (str run-output-dir)})
+  (tel/log! {:level :info :id :run/created-output-dir
+             :data {:run-id run-id :run-output-dir (str run-output-dir)}})
 
-  (util/log! {:timestamp (util/now!)
-              :event "created_samples"
-              :run-id run-id
-              :num-samples (count samples)})
+  (tel/log! {:level :info :id :run/created-samples
+             :data {:run-id run-id :num-samples (count samples)}})
 
   (doseq [samplesheet-file samplesheet-files]
     (let [samplesheet-dir (io/file (.getParent samplesheet-file))]
       (.mkdirs samplesheet-dir)
       (spit samplesheet-file samplesheet-string)
-      (util/log! {:timestamp (util/now!)
-                  :event "created_samplesheet_file"
-                  :run-id run-id
-                  :samplesheet-file (str samplesheet-file)})))
+      (tel/log! {:level :info :id :run/created-samplesheet-file
+                 :data {:run-id run-id :samplesheet-file (str samplesheet-file)}})))
 
   (.mkdirs fastq-subdir)
-  (util/log! {:timestamp (util/now!)
-              :event "created_fastq_subdir"
-              :run-id run-id
-              :fastq-subdir (str fastq-subdir)})
+  (tel/log! {:level :info :id :run/created-fastq-subdir
+             :data {:run-id run-id :fastq-subdir (str fastq-subdir)}})
 
   (doseq [[sample-num sample] (map-indexed vector samples)]
     (let [primary-species (:_primary-species sample)
@@ -239,27 +232,20 @@
                                          :contaminant-reference-seqs contaminant-refs
                                          :cross-contamination-rate cross-contamination-rate))))
 
-  (util/log! {:timestamp (util/now!)
-              :event "created_fastq_files"
-              :run-id run-id
-              :fastq-subdir (str fastq-subdir)
-              :num-fastq-files (* num-samples 2)})
+  (tel/log! {:level :info :id :run/created-fastq-files
+             :data {:run-id run-id :fastq-subdir (str fastq-subdir) :num-fastq-files (* num-samples 2)}})
 
   (when mark-upload-complete
     (let [f (io/file run-output-dir "upload_complete.json")]
       (.createNewFile f)
-      (util/log! {:timestamp (util/now!)
-                  :event "created_upload_complete_file"
-                  :run-id run-id
-                  :upload-complete-file (str f)})))
+      (tel/log! {:level :info :id :run/created-upload-complete-file
+                 :data {:run-id run-id :upload-complete-file (str f)}})))
 
   (when mark-qc-check-complete
     (let [f (io/file run-output-dir "qc_check_complete.json")]
       (.createNewFile f)
-      (util/log! {:timestamp (util/now!)
-                  :event "created_qc_check_complete_file"
-                  :run-id run-id
-                  :qc-check-complete-file (str f)}))))
+      (tel/log! {:level :info :id :run/created-qc-check-complete-file
+                 :data {:run-id run-id :qc-check-complete-file (str f)}}))))
 
 
 (defn simulate-run!
@@ -329,9 +315,8 @@
           (cli/exit 1 (str "Unknown instrument ID '" instrument-id "'. Known IDs: " (str/join ", " (sort known-ids)))))))
 
     (swap! db assoc :reference-seqs (reference/load-references!))
-    (util/log! {:timestamp (util/now!)
-                :event "loaded_reference_genomes"
-                :num-references (count (:reference-seqs @db))})
+    (tel/log! {:level :info :id :init/loaded-reference-genomes
+               :data {:num-references (count (:reference-seqs @db))}})
 
     (swap! db assoc :current-run-num-by-instrument-id
            (into {} (map (juxt :instrument-id :starting-run-number) (get-in @db [:config :instruments]))))
