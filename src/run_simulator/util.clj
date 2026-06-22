@@ -2,7 +2,6 @@
   (:require [clojure.java.io :as io]
             [clojure.edn :as edn]
             [clojure.string :as str]
-            [clojure.data.json :as json]
             [clojure.data.csv :as csv])
   (:import  [java.time.format DateTimeFormatter]
             [java.time ZonedDateTime]
@@ -46,12 +45,6 @@
        (#(maps->csv-data % headers))
        (map #(str/join "," %))
        (str/join "\n")))
-
-
-(defn log!
-  "Print a map as a JSON log line, converting hyphenated keys to underscores."
-  [m]
-  (println (json/write-str m :key-fn #(str/replace (name %) "-" "_") :escape-slash false)))
 
 
 (defn now!
