@@ -22,18 +22,14 @@
                :miseq six-digit-date
                :nextseq six-digit-date
                :i100 eight-digit-date)
-        run-id (case instrument-type
-                 :miseq (gen/generate generators/miseq-flowcell-id)
-                 :nextseq (gen/generate generators/nextseq-flowcell-id)
-                 :i100 (gen/generate generators/i100-flowcell-id))]
-    (str/join "_" [date
-                   instrument-id
-                   run-num
-                   run-id])))
+        flowcell-id (case instrument-type
+                      :miseq (gen/generate generators/miseq-flowcell-id)
+                      :nextseq (gen/generate generators/nextseq-flowcell-id)
+                      :i100 (gen/generate generators/i100-flowcell-id))]
+    (str/join "_" [date instrument-id run-num flowcell-id])))
 
 
 (defn generate-sample-id
-  ""
   [plate-num index]
   (str/join "-" [(gen/generate generators/container-id)
                  plate-num
@@ -42,72 +38,55 @@
 
 
 (defn generate-sample
-  ;; {:miseq-data-headers [:Sample_ID :Sample_Name :Sample_Plate :Sample_Well :Index_Plate_Well :I7_Index_ID :index :I5_Index_ID :index2 :Sample_Project :Description]
-  ;;  :nextseq-bclconvert-data-headers  [:Sample_ID :Index :Index2]
-  ;;  :nextseq-cloud-data-headers [:Sample_ID :ProjectName :LibraryName :LibraryPrepKitUrn :LibraryPrepKitName :IndexAdapterKitUrn :IndexAdapterKitName]}
-  ""
-  [plate-num instrument-type index db]
+  [plate-num instrument-type index projects]
   (let [sample-id (generate-sample-id plate-num index)
         index-with-sample-id (assoc index :Sample_ID sample-id)
-        project-id (util/randomly-select (conj (get-in @db [:config :projects]) ""))
+        project-id (util/randomly-select (conj projects ""))
         project-key (case instrument-type
                       :miseq :Sample_Project
                       :nextseq :ProjectName
                       :i100 :ProjectName)
-        index-with-sample-id-and-project-id (assoc index-with-sample-id project-key project-id)
+        index-with-project (assoc index-with-sample-id project-key project-id)
         blank-fields (case instrument-type
                        :miseq [:Sample_Name :Sample_Plate :Sample_Well :Description]
                        :nextseq [:LibraryName :LibraryPrepKitUrn :LibraryPrepKitName :IndexAdapterKitUrn :IndexAdapterKitName]
                        :i100 [:LibraryName :LibraryPrepKitUrn :LibraryPrepKitName :IndexAdapterKitUrn :IndexAdapterKitName])]
-    (reduce #(assoc % %2 "") index-with-sample-id-and-project-id blank-fields)))
+    (reduce #(assoc % %2 "") index-with-project blank-fields)))
 
 
 (defn generate-samples
-  ""
-  [num-samples indexes instrument-type db]
-  (loop [num-generated 1
-         plate-num (get @db :current-plate-number)
-         available-indexes indexes
-         samples []]
-    (if (>= num-generated num-samples)
-      samples
-      (recur (inc num-generated)
-             (do (when (= (mod num-generated 96) 0)
-                   (swap! db update :current-plate-number inc))
-                 (get @db :current-plate-number))
-             (drop 1 available-indexes)
-             (conj samples (generate-sample plate-num instrument-type (first available-indexes) db))))))
+  [num-samples indexes instrument-type plate-num projects]
+  (mapv (fn [i index]
+          (generate-sample (+ plate-num (quot i 96)) instrument-type index projects))
+        (range num-samples)
+        indexes))
 
 
 (defn miseq-fastq-subdir
-  ""
-  ([output-dir-strucutre-type db]
-   (case output-dir-strucutre-type
+  ([output-dir-structure-type date-str]
+   (case output-dir-structure-type
      :old "Data/Intensities/BaseCalls"
-     :new (str (io/file "Alignment_1" (str (str/replace (str (:current-date @db)) "-" "") "_" (gen/generate generators/six-digit-timestamp)) "Fastq"))))
-  ([output-dir-strucutre-type demultiplexing-num db]
-   (case output-dir-strucutre-type
+     :new (str (io/file "Alignment_1"
+                        (str (str/replace date-str "-" "") "_" (gen/generate generators/six-digit-timestamp))
+                        "Fastq"))))
+  ([output-dir-structure-type demultiplexing-num date-str]
+   (case output-dir-structure-type
      :old "Data/Intensities/BaseCalls"
-     :new (str (io/file (str "Alignment_" demultiplexing-num) (str (str/replace (str (:current-date @db)) "-" "") "_" (gen/generate generators/six-digit-timestamp)) "Fastq")))))
+     :new (str (io/file (str "Alignment_" demultiplexing-num)
+                        (str (str/replace date-str "-" "") "_" (gen/generate generators/six-digit-timestamp))
+                        "Fastq")))))
 
 
-(defn simulate-run!
-  ""
-  [db & {:keys [instrument-type]}]
-  (let [current-date (str (:current-date @db))
-        available-instruments (get-in @db [:config :instruments])
-        available-instruments (if instrument-type
-                                (filter #(= instrument-type (:instrument-type %)) available-instruments)
-                                available-instruments)
-        instrument (util/randomly-select available-instruments)
+(defn generate-run-plan
+  [{:keys [current-date instrument run-num plate-num projects config]}]
+  (let [date-str (str current-date)
         instrument-id (:instrument-id instrument)
         instrument-type (:instrument-type instrument)
-        run-num (get-in @db [:current-run-num-by-instrument-id instrument-id])
         padded-run-num (case instrument-type
                          :miseq (format "%04d" run-num)
                          :nextseq (format "%d" run-num)
                          :i100 (format "%04d" run-num))
-        run-id (generate-run-id current-date instrument-id padded-run-num instrument-type)
+        run-id (generate-run-id date-str instrument-id padded-run-num instrument-type)
         run-output-dir (io/file (:output-dir instrument) run-id)
         indexes-file (case instrument-type
                        :miseq (io/resource "indexes-miseq.csv")
@@ -115,7 +94,8 @@
                        :i100 (io/resource "indexes-i100.csv"))
         indexes (util/load-csv! indexes-file)
         num-samples (rand-int (count indexes))
-        samples (map #(generate-sample (:current-plate-number @db) instrument-type % db) (take num-samples indexes))
+        samples (mapv #(generate-sample plate-num instrument-type % projects)
+                      (take num-samples indexes))
         samplesheet-template (case instrument-type
                                :miseq (util/load-edn! (io/resource "samplesheet-template-miseq.edn"))
                                :nextseq (util/load-edn! (io/resource "samplesheet-template-nextseq.edn"))
@@ -134,73 +114,98 @@
                                       (io/file run-output-dir "Analysis/1/Data" "SampleSheet.csv")]
                             :i100    [(io/file run-output-dir "SampleSheet.csv")
                                       (io/file run-output-dir "Analysis/1/inputs" "SampleSheet.csv")])
-        
         fastq-subdir (io/file run-output-dir (case instrument-type
-                                               :miseq (miseq-fastq-subdir (:output-dir-structure instrument) db)
+                                               :miseq (miseq-fastq-subdir (:output-dir-structure instrument) date-str)
                                                :nextseq "Analysis/1/Data/fastq"
-                                               :i100 "Analysis/1/Data/BCLConvert/fastq"))
-        upload-complete-file (io/file run-output-dir "upload_complete.json")
-        qc-check-complete-file (io/file run-output-dir "qc_check_complete.json")]
-    
-    (.mkdirs run-output-dir)
-    (util/log! {:timestamp (util/now!)
-                :event "created_run_output_dir"
-                :run-id run-id
-                :run-output-dir (str run-output-dir)})
-    
-    (util/log! {:timestamp (util/now!)
-                :event "created_samples"
-                :run-id run-id
-                :num-samples (count samples)})
+                                               :i100 "Analysis/1/Data/BCLConvert/fastq"))]
+    {:run-id run-id
+     :instrument-id instrument-id
+     :instrument-type instrument-type
+     :run-output-dir run-output-dir
+     :samples samples
+     :num-samples num-samples
+     :samplesheet-string samplesheet-string
+     :samplesheet-files samplesheet-files
+     :fastq-subdir fastq-subdir
+     :mark-upload-complete (:mark-upload-complete config)
+     :mark-qc-check-complete (:mark-qc-check-complete config)}))
 
-    (doseq [samplesheet-file samplesheet-files]
-      (let [samplesheet-dir (io/file (.getParent samplesheet-file))]
-        (.mkdirs samplesheet-dir)
-        (spit samplesheet-file samplesheet-string)
-        (util/log! {:timestamp (util/now!)
-                    :event "created_samplesheet_file"
-                    :run-id run-id
-                    :samplesheet-file (str samplesheet-file)})))
-    
-    
-    (.mkdirs fastq-subdir)
-    (util/log! {:timestamp (util/now!)
-                :event "created_fastq_subdir"
-                :run-id run-id
-                :fastq-subdir (str fastq-subdir)})
-    
-    (doseq [[sample-num sample] (map-indexed vector samples)]
-      (.createNewFile (io/file fastq-subdir (str (:Sample_ID sample) "_S" sample-num "_L001_R1_001.fastq.gz"))))
-    (doseq [[sample-num sample] (map-indexed vector samples)]
-      (.createNewFile (io/file fastq-subdir (str (:Sample_ID sample) "_S" sample-num "_L001_R2_001.fastq.gz"))))
-    
-    (util/log! {:timestamp (util/now!)
-                :event "created_fastq_symlinks"
-                :run-id run-id
-                :fastq-subdir (str fastq-subdir)
-                :num-symlinks (* num-samples 2)})
-    
-    (when (get-in @db [:config :mark-upload-complete])
-      (.createNewFile upload-complete-file)
+
+(defn write-run!
+  [{:keys [run-id run-output-dir samples num-samples
+           samplesheet-string samplesheet-files
+           fastq-subdir mark-upload-complete mark-qc-check-complete]}]
+  (.mkdirs run-output-dir)
+  (util/log! {:timestamp (util/now!)
+              :event "created_run_output_dir"
+              :run-id run-id
+              :run-output-dir (str run-output-dir)})
+
+  (util/log! {:timestamp (util/now!)
+              :event "created_samples"
+              :run-id run-id
+              :num-samples (count samples)})
+
+  (doseq [samplesheet-file samplesheet-files]
+    (let [samplesheet-dir (io/file (.getParent samplesheet-file))]
+      (.mkdirs samplesheet-dir)
+      (spit samplesheet-file samplesheet-string)
+      (util/log! {:timestamp (util/now!)
+                  :event "created_samplesheet_file"
+                  :run-id run-id
+                  :samplesheet-file (str samplesheet-file)})))
+
+  (.mkdirs fastq-subdir)
+  (util/log! {:timestamp (util/now!)
+              :event "created_fastq_subdir"
+              :run-id run-id
+              :fastq-subdir (str fastq-subdir)})
+
+  (doseq [[sample-num sample] (map-indexed vector samples)]
+    (.createNewFile (io/file fastq-subdir (str (:Sample_ID sample) "_S" sample-num "_L001_R1_001.fastq.gz"))))
+  (doseq [[sample-num sample] (map-indexed vector samples)]
+    (.createNewFile (io/file fastq-subdir (str (:Sample_ID sample) "_S" sample-num "_L001_R2_001.fastq.gz"))))
+
+  (util/log! {:timestamp (util/now!)
+              :event "created_fastq_symlinks"
+              :run-id run-id
+              :fastq-subdir (str fastq-subdir)
+              :num-symlinks (* num-samples 2)})
+
+  (when mark-upload-complete
+    (let [f (io/file run-output-dir "upload_complete.json")]
+      (.createNewFile f)
       (util/log! {:timestamp (util/now!)
                   :event "created_upload_complete_file"
                   :run-id run-id
-                  :upload-complete-file (str upload-complete-file)}))
+                  :upload-complete-file (str f)})))
 
-    (when (get-in @db [:config :mark-qc-check-complete])
-      (.createNewFile qc-check-complete-file)
+  (when mark-qc-check-complete
+    (let [f (io/file run-output-dir "qc_check_complete.json")]
+      (.createNewFile f)
       (util/log! {:timestamp (util/now!)
                   :event "created_qc_check_complete_file"
                   :run-id run-id
-                  :qc-check-complete-file (str qc-check-complete-file)}))
-    
-    (swap! db update-in [:current-run-num-by-instrument-id instrument-id] inc)
-    
-    {:instrument-type instrument-type
-     :run-id run-id
-     :num-samples num-samples
-     :output-dir run-output-dir
-     :samplesheet-files samplesheet-files}))
+                  :qc-check-complete-file (str f)}))))
+
+
+(defn simulate-run!
+  [db & {:keys [instrument-type]}]
+  (let [available-instruments (get-in @db [:config :instruments])
+        available-instruments (if instrument-type
+                                (filter #(= instrument-type (:instrument-type %)) available-instruments)
+                                available-instruments)
+        instrument (util/randomly-select available-instruments)
+        plan (generate-run-plan
+              {:current-date (:current-date @db)
+               :instrument instrument
+               :run-num (get-in @db [:current-run-num-by-instrument-id (:instrument-id instrument)])
+               :plate-num (:current-plate-number @db)
+               :projects (get-in @db [:config :projects])
+               :config (:config @db)})]
+    (write-run! plan)
+    (swap! db update-in [:current-run-num-by-instrument-id (:instrument-id instrument)] inc)
+    plan))
 
 
 (defn -main
@@ -212,14 +217,10 @@
   (when (not (empty? (:errors opts)))
     (cli/exit 1 (str/join \newline (:errors opts))))
 
-  ;;
-  ;; Handle -h and --help flags
   (when (get-in opts [:options :help])
     (let [options-summary (:summary opts)]
       (cli/exit 0 (cli/usage options-summary))))
 
-  ;;
-  ;; Handle -v and --version flags
   (when (get-in opts [:options :version])
     (cli/exit 0 cli/version))
 
@@ -233,7 +234,6 @@
 
   (swap! db assoc :current-plate-number (get-in @db [:config :starting-plate-number]))
 
-  
   (loop []
     (simulate-run! db)
     (Thread/sleep (get-in @db [:config :run-interval-ms]))
