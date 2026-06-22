@@ -54,14 +54,6 @@
     (reduce #(assoc % %2 "") index-with-project blank-fields)))
 
 
-(defn generate-samples
-  [num-samples indexes instrument-type plate-num projects]
-  (mapv (fn [i index]
-          (generate-sample (+ plate-num (quot i 96)) instrument-type index projects))
-        (range num-samples)
-        indexes))
-
-
 (defn miseq-fastq-subdir
   ([output-dir-structure-type date-str]
    (case output-dir-structure-type
@@ -94,8 +86,13 @@
                        :i100 (io/resource "indexes-i100.csv"))
         indexes (util/load-csv! indexes-file)
         num-samples (rand-int (count indexes))
-        samples (mapv #(generate-sample plate-num instrument-type % projects)
+        samples (mapv (fn [i index]
+                        (generate-sample (+ plate-num (quot i 96)) instrument-type index projects))
+                      (range num-samples)
                       (take num-samples indexes))
+        plates-consumed (if (pos? num-samples)
+                          (inc (quot (dec num-samples) 96))
+                          0)
         samplesheet-template (case instrument-type
                                :miseq (util/load-edn! (io/resource "samplesheet-template-miseq.edn"))
                                :nextseq (util/load-edn! (io/resource "samplesheet-template-nextseq.edn"))
@@ -127,6 +124,7 @@
      :samplesheet-string samplesheet-string
      :samplesheet-files samplesheet-files
      :fastq-subdir fastq-subdir
+     :plates-consumed plates-consumed
      :mark-upload-complete (:mark-upload-complete config)
      :mark-qc-check-complete (:mark-qc-check-complete config)}))
 
@@ -205,6 +203,7 @@
                :config (:config @db)})]
     (write-run! plan)
     (swap! db update-in [:current-run-num-by-instrument-id (:instrument-id instrument)] inc)
+    (swap! db update :current-plate-number + (:plates-consumed plan))
     plan))
 
 
