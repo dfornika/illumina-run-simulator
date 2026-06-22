@@ -2,7 +2,7 @@
   (:require [clojure.java.io :as io]
             [clojure.string :as str]))
 
-(def version "v0.2.3")
+(def version "v0.3.0")
 
 (defn usage
   "Build the CLI usage/help string from the options summary."
