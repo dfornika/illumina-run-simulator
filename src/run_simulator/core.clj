@@ -4,13 +4,19 @@
             [clojure.tools.cli :refer [parse-opts]]
             [clojure.spec.alpha :as spec]
             [clojure.spec.gen.alpha :as gen]
+            [clojure.data.xml :as xml]
             [taoensso.telemere :as tel]
             [run-simulator.cli :as cli]
             [run-simulator.util :as util]
             [run-simulator.generators :as generators]
             [run-simulator.samplesheet :as samplesheet]
             [run-simulator.reference :as reference]
-            [run-simulator.fastq :as fastq])
+            [run-simulator.fastq :as fastq]
+            [run-simulator.tile :as tile]
+            [run-simulator.bcl :as bcl]
+            [run-simulator.locs :as locs]
+            [run-simulator.filter :as filt]
+            [run-simulator.runinfo :as runinfo])
   (:gen-class))
 
 
@@ -185,6 +191,9 @@
      :samplesheet-string samplesheet-string
      :samplesheet-files samplesheet-files
      :fastq-subdir fastq-subdir
+     :bcl-base-dir (io/file run-output-dir "Data" "Intensities" "BaseCalls")
+     :locs-base-dir (io/file run-output-dir "Data" "Intensities")
+     :tiles [1101]
      :fastq-params {:read-length read-length
                     :instrument instrument-id
                     :run-number padded-run-num
@@ -197,12 +206,30 @@
      :mark-qc-check-complete (:mark-qc-check-complete config)}))
 
 
+(defn write-runinfo-xml!
+  "Write RunInfo.xml for the run."
+  [{:keys [run-id run-output-dir instrument-type fastq-params]}]
+  (let [read-length (:read-length fastq-params)
+        runinfo-data (case instrument-type
+                       :miseq (runinfo/generate-runinfo-data-miseq run-id read-length)
+                       :nextseq (runinfo/generate-runinfo-data-nextseq run-id read-length)
+                       :i100 (runinfo/generate-runinfo-data-nextseq run-id read-length))
+        xml-str (xml/indent-str (xml/sexp-as-element runinfo-data))
+        path (io/file run-output-dir "RunInfo.xml")]
+    (spit path xml-str)
+    (tel/log! {:level :info :id :run/created-runinfo-xml
+               :data {:run-id run-id :path (str path)}})))
+
+
 (defn write-run!
-  "Write all run output: directories, samplesheets, FASTQ files, and optional completion markers."
+  "Write all run output: directories, samplesheets, BCL, LOCS, filter, FASTQ files, and optional completion markers."
   [{:keys [run-id run-output-dir samples num-samples
            samplesheet-string samplesheet-files
            fastq-subdir fastq-params reference-seqs
-           mark-upload-complete mark-qc-check-complete]}]
+           bcl-base-dir locs-base-dir tiles
+           instrument-type
+           mark-upload-complete mark-qc-check-complete]
+    :as plan}]
   (.mkdirs run-output-dir)
   (tel/log! {:level :info :id :run/created-output-dir
              :data {:run-id run-id :run-output-dir (str run-output-dir)}})
@@ -217,20 +244,44 @@
       (tel/log! {:level :info :id :run/created-samplesheet-file
                  :data {:run-id run-id :samplesheet-file (str samplesheet-file)}})))
 
+  (write-runinfo-xml! plan)
+
   (.mkdirs fastq-subdir)
   (tel/log! {:level :info :id :run/created-fastq-subdir
              :data {:run-id run-id :fastq-subdir (str fastq-subdir)}})
 
-  (doseq [[sample-num sample] (map-indexed vector samples)]
-    (let [primary-species (:_primary-species sample)
-          primary-ref (get reference-seqs primary-species)
-          contaminant-refs (dissoc (select-keys reference-seqs (keys (:_species-weights sample))) primary-species)
-          cross-contamination-rate (:_cross-contamination-rate sample 0)]
-      (fastq/write-sample-fastqs! fastq-subdir sample-num sample
-                                  (assoc fastq-params
-                                         :primary-reference-seq primary-ref
-                                         :contaminant-reference-seqs contaminant-refs
-                                         :cross-contamination-rate cross-contamination-rate))))
+  (let [lane (:lane fastq-params)
+        read-length (:read-length fastq-params)
+        header-params (select-keys fastq-params [:instrument :run-number :flowcell-id :lane :tile])]
+    (doseq [tile-id tiles]
+      (let [clusters (tile/generate-tile-clusters
+                      {:samples samples
+                       :fastq-params fastq-params
+                       :reference-seqs reference-seqs})
+            clusters-by-sample (group-by :sample-index clusters)]
+
+        (locs/write-locs-file!
+         (io/file locs-base-dir (str "s_" lane "_" tile-id ".locs"))
+         clusters)
+        (tel/log! {:level :info :id :run/created-locs-file
+                   :data {:run-id run-id :tile tile-id :num-clusters (count clusters)}})
+
+        (filt/write-filter-file!
+         (io/file bcl-base-dir (format "L%03d" lane) (str "s_" lane "_" tile-id ".filter"))
+         clusters)
+        (tel/log! {:level :info :id :run/created-filter-file
+                   :data {:run-id run-id :tile tile-id}})
+
+        (bcl/write-tile-bcl-files! bcl-base-dir lane tile-id clusters read-length)
+        (tel/log! {:level :info :id :run/created-bcl-files
+                   :data {:run-id run-id :tile tile-id :num-cycles (* 2 read-length)}})
+
+        (doseq [[sample-index sample-clusters] (sort-by key clusters-by-sample)]
+          (let [sample (nth samples sample-index)
+                sample-id (:Sample_ID sample)]
+            (fastq/write-sample-fastqs-from-clusters!
+             fastq-subdir sample-index sample-id sample-clusters
+             (assoc header-params :tile tile-id)))))))
 
   (tel/log! {:level :info :id :run/created-fastq-files
              :data {:run-id run-id :fastq-subdir (str fastq-subdir) :num-fastq-files (* num-samples 2)}})

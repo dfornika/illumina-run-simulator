@@ -1,6 +1,6 @@
 (ns run-simulator.bcl
-  (:require [run-simulator.util :as util])
-  (:import java.nio.ByteBuffer))
+  (:require [clojure.java.io :as io]
+            [run-simulator.util :as util]))
 
 (def bcl-header-size 4)
 
@@ -36,12 +36,51 @@
   "Read the cluster count from the 4-byte BCL file header (little-endian)."
   [bcl-bytes]
   (let [num-clusters-bytes (take 4 bcl-bytes)]
-    (util/bytes->long (byte-array num-clusters-bytes) :little-endian)))
+    (util/bytes->int (byte-array num-clusters-bytes) :little-endian)))
 
-(comment
-    (def test-bcl-path "test/resources/picard_bcl_passing.bcl")
-    (def test-bcl-bytes (util/slurp-bytes test-bcl-path))
-    (def num-test-bcl-clusters (num-clusters test-bcl-bytes))
-    (last (map byte->basecall (drop bcl-header-size test-bcl-bytes)))
-    
-  )
+(def ^:private base->bits
+  {\A 0 \C 1 \G 2 \T 3})
+
+
+(defn encode-bcl-byte
+  "Encode a base character and quality score into a single BCL byte."
+  [base qual]
+  (if (= \N base)
+    (unchecked-byte 0)
+    (unchecked-byte (bit-or (bit-shift-left (min qual 63) 2)
+                            (base->bits base)))))
+
+
+(defn write-bcl-file!
+  "Write one BCL file for a single cycle. clusters is a seq of cluster maps,
+   read-key is :r1-bases or :r2-bases, qual-key is :r1-quals or :r2-quals,
+   cycle-index is the 0-based position within that read."
+  [path clusters read-key qual-key cycle-index]
+  (let [n (count clusters)
+        header (util/int->bytes n :little-endian)
+        data (byte-array (map (fn [cluster]
+                                (let [base (nth (read-key cluster) cycle-index)
+                                      qual (nth (qual-key cluster) cycle-index)]
+                                  (encode-bcl-byte base qual)))
+                              clusters))]
+    (io/make-parents path)
+    (with-open [out (io/output-stream (io/file path))]
+      (.write out ^bytes header)
+      (.write out ^bytes data))))
+
+
+(defn write-tile-bcl-files!
+  "Write all BCL files for a tile: one file per cycle for R1 and R2."
+  [base-dir lane tile clusters read-length]
+  (let [lane-str (format "L%03d" lane)
+        tile-str (str tile)]
+    (dotimes [i read-length]
+      (let [cycle-num (inc i)
+            cycle-dir (format "C%d.1" cycle-num)
+            path (io/file base-dir lane-str cycle-dir (str "s_" lane "_" tile-str ".bcl"))]
+        (write-bcl-file! path clusters :r1-bases :r1-quals i)))
+    (dotimes [i read-length]
+      (let [cycle-num (+ read-length (inc i))
+            cycle-dir (format "C%d.1" cycle-num)
+            path (io/file base-dir lane-str cycle-dir (str "s_" lane "_" tile-str ".bcl"))]
+        (write-bcl-file! path clusters :r2-bases :r2-quals i)))))
