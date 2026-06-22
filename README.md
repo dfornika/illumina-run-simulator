@@ -72,15 +72,16 @@ This tool expects an [edn](https://github.com/edn-format/edn)-formatted config f
                 :instrument-type :nextseq
                 :starting-run-number 12}]
  :projects [{:name "mysterious_experiment"
-             :species ["SARS-CoV-2"]}
+             :species {"SARS-CoV-2" 1.0}}
             {:name "routine_testing"
-             :species ["SARS-CoV-2" "RSV"]}
+             :species {"SARS-CoV-2" 0.5 "RSV" 0.3 "Mpox" 0.2}
+             :cross-contamination-rate 0.02}
             {:name "quality_check"
-             :species ["SARS-CoV-2"]}
+             :species {"SARS-CoV-2" 1.0}}
             {:name "viral_outbreak"
-             :species ["Mpox"]}
+             :species {"Mpox" 1.0}}
             {:name "assay_development"
-             :species ["RSV"]}]
+             :species {"RSV" 1.0}}]
  :reads-per-sample 100
  :starting-plate-number 100
  :starting-date "2022-06-01"
@@ -92,7 +93,7 @@ This tool expects an [edn](https://github.com/edn-format/edn)-formatted config f
 | Field | Description |
 |-------|-------------|
 | `:instruments` | List of instrument definitions. Each has an `:instrument-id`, `:output-dir`, `:instrument-type` (`:miseq`, `:nextseq`, or `:i100`), and `:starting-run-number`. MiSeq instruments also accept `:output-dir-structure` (`:old` or `:new`). |
-| `:projects` | List of sequencing projects. Each has a `:name` and a `:species` list. Species must match entries in the bundled reference genome registry. |
+| `:projects` | List of sequencing projects. Each has a `:name` and a `:species` map of `{species-name weight}`. Species names must match entries in the bundled reference genome registry. Weights control how often each species is assigned as the primary species for a sample. Optional `:cross-contamination-rate` (0.0–1.0) controls the fraction of reads drawn from other species in the project. |
 | `:reads-per-sample` | Number of read pairs to generate per sample. |
 | `:starting-plate-number` | Plate numbering starts here and increments across runs. |
 | `:starting-date` | Simulated run dates start from this ISO date and advance by 1-10 days between runs. |
@@ -109,7 +110,7 @@ The simulator includes reference genomes for three species:
 | Mpox | NC_063383.1 | ~197 kb |
 | RSV | NC_001781.1 | ~15 kb |
 
-Each project in the config specifies which species are sequenced. Reads are distributed across the listed species.
+Each project in the config specifies which species are sequenced using a weighted map. Each sample is assigned a primary species by weighted random draw, and most reads come from that species' reference. If `:cross-contamination-rate` is set, a fraction of reads are drawn from other species in the project. Projects with an empty or omitted `:species` map generate purely random sequence data.
 
 ## Output
 
@@ -163,15 +164,21 @@ After generating runs across multiple instruments, the output directory structur
 
 ## Logging
 
-Logs are in [JSON Lines](https://jsonlines.org/) format. Each line is a JSON object with a `timestamp` and `event` field:
+Logging uses [taoensso/telemere](https://github.com/taoensso/telemere) for structured output. Each event has a namespaced ID and a data map:
 
-```json
-{"timestamp":"2022-06-16T16:14:21.523984-07:00","event":"loaded_reference_genomes","num_references":3}
-{"timestamp":"2022-06-16T16:14:21.525995-07:00","event":"created_run_output_dir","run_id":"220601_M00123_300_000000000-9231O","run_output_dir":"test_output/M00123/22/220601_M00123_300_000000000-9231O"}
-{"timestamp":"2022-06-16T16:14:21.525995-07:00","event":"created_samples","run_id":"220601_M00123_300_000000000-9231O","num_samples":93}
-{"timestamp":"2022-06-16T16:14:21.528003-07:00","event":"created_samplesheet_file","run_id":"220601_M00123_300_000000000-9231O","samplesheet_file":"test_output/M00123/22/220601_M00123_300_000000000-9231O/SampleSheet.csv"}
-{"timestamp":"2022-06-16T16:14:21.528502-07:00","event":"created_fastq_subdir","run_id":"220601_M00123_300_000000000-9231O","fastq_subdir":"test_output/M00123/22/220601_M00123_300_000000000-9231O/Data/Intensities/BaseCalls"}
-{"timestamp":"2022-06-16T16:14:21.533077-07:00","event":"created_fastq_files","run_id":"220601_M00123_300_000000000-9231O","num_fastq_files":186}
+```
+2022-06-16T16:14:21.524Z INFO LOG :init/loaded-reference-genomes
+   data: {:num-references 3}
+2022-06-16T16:14:21.526Z INFO LOG :run/created-output-dir
+   data: {:run-id "220601_M00123_300_000000000-9231O", :run-output-dir "test_output/M00123/22/220601_M00123_300_000000000-9231O"}
+2022-06-16T16:14:21.526Z INFO LOG :run/created-samples
+   data: {:run-id "220601_M00123_300_000000000-9231O", :num-samples 93}
+2022-06-16T16:14:21.528Z INFO LOG :run/created-samplesheet-file
+   data: {:run-id "220601_M00123_300_000000000-9231O", :samplesheet-file "test_output/M00123/22/220601_M00123_300_000000000-9231O/SampleSheet.csv"}
+2022-06-16T16:14:21.529Z INFO LOG :run/created-fastq-subdir
+   data: {:run-id "220601_M00123_300_000000000-9231O", :fastq-subdir "test_output/M00123/22/220601_M00123_300_000000000-9231O/Data/Intensities/BaseCalls"}
+2022-06-16T16:14:21.533Z INFO LOG :run/created-fastq-files
+   data: {:run-id "220601_M00123_300_000000000-9231O", :fastq-subdir "test_output/M00123/22/220601_M00123_300_000000000-9231O/Data/Intensities/BaseCalls", :num-fastq-files 186}
 ```
 
 ## Development
