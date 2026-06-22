@@ -53,7 +53,7 @@
           plate (core/generate-plate {:plate-num 1
                                        :instrument-type :miseq
                                        :indexes indexes
-                                       :project {:name "TestProject" :species ["SARS-CoV-2"]}
+                                       :project {:name "TestProject" :species {"SARS-CoV-2" 1.0}}
                                        :num-samples 5})]
       (t/is (= 5 (count (:samples plate))))
       (t/is (= 1 (:plate-num plate)))))
@@ -65,7 +65,7 @@
           plate (core/generate-plate {:plate-num 1
                                        :instrument-type :miseq
                                        :indexes indexes
-                                       :project {:name "TestProject" :species ["SARS-CoV-2"]}
+                                       :project {:name "TestProject" :species {"SARS-CoV-2" 1.0}}
                                        :num-samples 200})]
       (t/is (<= (count (:samples plate)) 96)))))
 
@@ -85,7 +85,7 @@
                                          :starting-plate-num 1
                                          :instrument-type :miseq
                                          :indexes-by-set idx-by-set
-                                         :projects [{:name "P1" :species ["SARS-CoV-2"]}]})]
+                                         :projects [{:name "P1" :species {"SARS-CoV-2" 1.0}}]})]
       (t/is (= 2 (count plates)))
       (t/is (= 1 (:plate-num (first plates))))
       (t/is (= 2 (:plate-num (second plates))))))
@@ -99,5 +99,5 @@
                                          :starting-plate-num 1
                                          :instrument-type :miseq
                                          :indexes-by-set idx-by-set
-                                         :projects [{:name "P1" :species ["SARS-CoV-2"]}]})]
+                                         :projects [{:name "P1" :species {"SARS-CoV-2" 1.0}}]})]
       (t/is (= 1 (count plates))))))

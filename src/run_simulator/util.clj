@@ -106,6 +106,20 @@
       nil)))
 
 
+(defn weighted-random-select
+  "Select a key from a map of {item weight} by weighted random draw."
+  [weight-map]
+  (let [total (reduce + (vals weight-map))
+        r (* (rand) total)]
+    (loop [remaining (seq weight-map)
+           cumulative 0.0]
+      (let [[item weight] (first remaining)
+            cumulative (+ cumulative weight)]
+        (if (or (< r cumulative) (nil? (next remaining)))
+          item
+          (recur (next remaining) cumulative))))))
+
+
 (defn int->well
   "Given an integer `n`, return the well that corresponds. 0 -> A01, 95 -> H12. Wrap back to A01 for integers > 95 and repeat as needed."
   [n]

@@ -54,33 +54,40 @@
                  r2-seq r2-qual-str)}))
 
 
+(defn- select-reference-seq
+  "Select a reference sequence for one read. With probability (1 - cross-contamination-rate),
+   returns the primary; otherwise picks uniformly from contaminants."
+  [primary-reference-seq contaminant-reference-seqs cross-contamination-rate]
+  (if (or (zero? cross-contamination-rate)
+          (empty? contaminant-reference-seqs)
+          (>= (rand) cross-contamination-rate))
+    primary-reference-seq
+    (rand-nth (vec (vals contaminant-reference-seqs)))))
+
+
 (defn generate-sample-fastq
-  "Generate R1 and R2 FASTQ content for a sample, distributing reads across reference species."
-  [{:keys [reference-seqs read-length num-reads
+  "Generate R1 and R2 FASTQ content for a sample. Most reads come from the primary reference;
+   a fraction (cross-contamination-rate) are stochastically drawn from contaminant references."
+  [{:keys [primary-reference-seq contaminant-reference-seqs cross-contamination-rate
+           read-length num-reads
            instrument run-number flowcell-id lane tile
            index-sequence error-profile]}]
-  (let [num-species (count reference-seqs)
-        reads-per-species (partition-all (max 1 (quot num-reads num-species))
-                                        (range num-reads))
-        species-seqs (vec (vals reference-seqs))
-        read-pairs (mapcat
-                    (fn [read-indices species-idx]
-                      (let [ref-seq (nth species-seqs (min species-idx (dec num-species)))]
-                        (map (fn [i]
-                               (generate-read-pair
-                                {:reference-seq ref-seq
-                                 :read-length read-length
-                                 :read-index i
-                                 :instrument instrument
-                                 :run-number run-number
-                                 :flowcell-id flowcell-id
-                                 :lane lane
-                                 :tile tile
-                                 :index-sequence index-sequence
-                                 :error-profile error-profile}))
-                             read-indices)))
-                    reads-per-species
-                    (range))]
+  (let [read-pairs (map (fn [i]
+                          (let [ref-seq (select-reference-seq primary-reference-seq
+                                                              contaminant-reference-seqs
+                                                              (or cross-contamination-rate 0))]
+                            (generate-read-pair
+                             {:reference-seq ref-seq
+                              :read-length read-length
+                              :read-index i
+                              :instrument instrument
+                              :run-number run-number
+                              :flowcell-id flowcell-id
+                              :lane lane
+                              :tile tile
+                              :index-sequence index-sequence
+                              :error-profile error-profile})))
+                        (range num-reads))]
     {:r1-content (str (str/join "\n" (map :r1-record read-pairs)) "\n")
      :r2-content (str (str/join "\n" (map :r2-record read-pairs)) "\n")}))
 

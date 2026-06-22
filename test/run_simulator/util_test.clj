@@ -30,5 +30,14 @@
     (t/is (not (nil? (re-matches #"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+([+-]\d{2}:\d{2}|Z)" (util/now!))))))
   )
 
+
+(t/deftest weighted-random-select-unit
+  (t/testing "Single-item map always returns that item"
+    (t/is (= "A" (util/weighted-random-select {"A" 1.0}))))
+  (t/testing "Result is always a key from the weight map"
+    (let [weights {"X" 0.5 "Y" 0.3 "Z" 0.2}]
+      (doseq [_ (range 50)]
+        (t/is (contains? weights (util/weighted-random-select weights)))))))
+
           
 

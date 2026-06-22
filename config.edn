@@ -13,15 +13,16 @@
                 :instrument-type :nextseq
                 :starting-run-number 12}]
  :projects [{:name "mysterious_experiment"
-             :species ["SARS-CoV-2"]}
+             :species {"SARS-CoV-2" 1.0}}
             {:name "routine_testing"
-             :species ["SARS-CoV-2" "RSV"]}
+             :species {"SARS-CoV-2" 0.5 "RSV" 0.3 "Mpox" 0.2}
+             :cross-contamination-rate 0.02}
             {:name "quality_check"
-             :species ["SARS-CoV-2"]}
+             :species {"SARS-CoV-2" 1.0}}
             {:name "viral_outbreak"
-             :species ["Mpox"]}
+             :species {"Mpox" 1.0}}
             {:name "assay_development"
-             :species ["RSV"]}]
+             :species {"RSV" 1.0}}]
  :reads-per-sample 100
  :starting-plate-number 100
  :starting-date "2022-06-01"

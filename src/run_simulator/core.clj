@@ -51,9 +51,12 @@
                       :miseq :Sample_Project
                       :nextseq :ProjectName
                       :i100 :ProjectName)
+        primary-species (util/weighted-random-select (:species project))
         index-with-project (assoc index-with-sample-id
                                   project-key project-name
-                                  :_species (:species project))
+                                  :_primary-species primary-species
+                                  :_species-weights (:species project)
+                                  :_cross-contamination-rate (or (:cross-contamination-rate project) 0))
         blank-fields (case instrument-type
                        :miseq [:Sample_Name :Sample_Plate :Sample_Well :Description]
                        :nextseq [:LibraryName :LibraryPrepKitUrn :LibraryPrepKitName :IndexAdapterKitUrn :IndexAdapterKitName]
@@ -225,10 +228,15 @@
               :fastq-subdir (str fastq-subdir)})
 
   (doseq [[sample-num sample] (map-indexed vector samples)]
-    (let [species-list (:_species sample)
-          sample-refs (select-keys reference-seqs species-list)]
+    (let [primary-species (:_primary-species sample)
+          primary-ref (get reference-seqs primary-species)
+          contaminant-refs (dissoc (select-keys reference-seqs (keys (:_species-weights sample))) primary-species)
+          cross-contamination-rate (:_cross-contamination-rate sample 0)]
       (fastq/write-sample-fastqs! fastq-subdir sample-num sample
-                                  (assoc fastq-params :reference-seqs sample-refs))))
+                                  (assoc fastq-params
+                                         :primary-reference-seq primary-ref
+                                         :contaminant-reference-seqs contaminant-refs
+                                         :cross-contamination-rate cross-contamination-rate))))
 
   (util/log! {:timestamp (util/now!)
               :event "created_fastq_files"

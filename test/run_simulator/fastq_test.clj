@@ -69,35 +69,43 @@
       (t/is (str/includes? r2-header " 2:")))))
 
 
+(def ^:private base-fastq-params
+  {:read-length 50
+   :instrument "M00123"
+   :run-number "0001"
+   :flowcell-id "FLOWCELL"
+   :lane 1
+   :tile 1101
+   :index-sequence "ACGT+TGCA"
+   :error-profile {:L 0.1 :k 0.05 :x0 200}})
+
+
 (t/deftest generate-sample-fastq-unit
   (t/testing "Generates content for R1 and R2"
     (let [ref-seq (apply str (repeat 100 "ACGT"))
           result (fastq/generate-sample-fastq
-                  {:reference-seqs {"TestSpecies" ref-seq}
-                   :read-length 50
-                   :num-reads 5
-                   :instrument "M00123"
-                   :run-number "0001"
-                   :flowcell-id "FLOWCELL"
-                   :lane 1
-                   :tile 1101
-                   :index-sequence "ACGT+TGCA"
-                   :error-profile {:L 0.1 :k 0.05 :x0 200}})]
+                  (assoc base-fastq-params
+                         :primary-reference-seq ref-seq
+                         :num-reads 5))]
       (t/is (string? (:r1-content result)))
       (t/is (string? (:r2-content result)))))
   (t/testing "Number of reads matches num-reads"
     (let [ref-seq (apply str (repeat 100 "ACGT"))
           num-reads 10
           result (fastq/generate-sample-fastq
-                  {:reference-seqs {"TestSpecies" ref-seq}
-                   :read-length 50
-                   :num-reads num-reads
-                   :instrument "M00123"
-                   :run-number "0001"
-                   :flowcell-id "FLOWCELL"
-                   :lane 1
-                   :tile 1101
-                   :index-sequence "ACGT+TGCA"
-                   :error-profile {:L 0.1 :k 0.05 :x0 200}})
+                  (assoc base-fastq-params
+                         :primary-reference-seq ref-seq
+                         :num-reads num-reads))
           r1-headers (filter #(str/starts-with? % "@") (str/split-lines (:r1-content result)))]
-      (t/is (= num-reads (count r1-headers))))))
+      (t/is (= num-reads (count r1-headers)))))
+  (t/testing "With cross-contamination, all reads are still valid"
+    (let [primary-seq (apply str (repeat 100 "ACGT"))
+          contaminant-seq (apply str (repeat 100 "TTTT"))
+          result (fastq/generate-sample-fastq
+                  (assoc base-fastq-params
+                         :primary-reference-seq primary-seq
+                         :contaminant-reference-seqs {"Contaminant" contaminant-seq}
+                         :cross-contamination-rate 0.5
+                         :num-reads 20))
+          r1-headers (filter #(str/starts-with? % "@") (str/split-lines (:r1-content result)))]
+      (t/is (= 20 (count r1-headers))))))
