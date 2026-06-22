@@ -81,3 +81,29 @@
 (defn phred->char
   [phred]
   (char (+ phred 33)))
+
+
+(defn generate-quality-scores
+  [read-length {:keys [L k x0] :or {L 0.1 k 0.05 x0 200}}]
+  (mapv (fn [pos]
+          (let [base-prob (logistic-error-profile pos L k x0)
+                jittered (max 0.00001 (min 1.0 (+ base-prob (* base-prob (- (rand) 0.5) 0.3))))
+                phred (probability->phred jittered)]
+            (max 2 (min 41 phred))))
+        (range read-length)))
+
+
+(defn quality-scores->string
+  [scores]
+  (apply str (map phred->char scores)))
+
+
+(defn introduce-errors
+  [seq-str quality-scores]
+  (apply str
+         (map (fn [base phred]
+                (let [error-prob (Math/pow 10.0 (/ (- phred) 10.0))]
+                  (if (< (rand) error-prob)
+                    (rand-nth (vec (disj #{\A \C \G \T} base)))
+                    base)))
+              seq-str quality-scores)))

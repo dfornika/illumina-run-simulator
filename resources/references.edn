@@ -1,0 +1,12 @@
+[{:id "NC_045512.2"
+  :species "SARS-CoV-2"
+  :taxid 2697049
+  :fasta "NC_045512.2.fasta"}
+ {:id "NC_063383.1"
+  :species "Mpox"
+  :taxid 10244
+  :fasta "NC_063383.1.fasta"}
+ {:id "NC_001781.1"
+  :species "RSV"
+  :taxid 11250
+  :fasta "NC_001781.1.fasta"}]

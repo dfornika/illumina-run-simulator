@@ -7,7 +7,9 @@
             [run-simulator.cli :as cli]
             [run-simulator.util :as util]
             [run-simulator.generators :as generators]
-            [run-simulator.samplesheet :as samplesheet])
+            [run-simulator.samplesheet :as samplesheet]
+            [run-simulator.reference :as reference]
+            [run-simulator.fastq :as fastq])
   (:gen-class))
 
 
@@ -41,11 +43,14 @@
   [plate-num instrument-type index project]
   (let [sample-id (generate-sample-id plate-num index)
         index-with-sample-id (assoc index :Sample_ID sample-id)
+        project-name (:name project)
         project-key (case instrument-type
                       :miseq :Sample_Project
                       :nextseq :ProjectName
                       :i100 :ProjectName)
-        index-with-project (assoc index-with-sample-id project-key project)
+        index-with-project (assoc index-with-sample-id
+                                  project-key project-name
+                                  :_species (:species project))
         blank-fields (case instrument-type
                        :miseq [:Sample_Name :Sample_Plate :Sample_Well :Description]
                        :nextseq [:LibraryName :LibraryPrepKitUrn :LibraryPrepKitName :IndexAdapterKitUrn :IndexAdapterKitName]
@@ -148,7 +153,13 @@
         fastq-subdir (io/file run-output-dir (case instrument-type
                                                :miseq (miseq-fastq-subdir (:output-dir-structure instrument) date-str)
                                                :nextseq "Analysis/1/Data/fastq"
-                                               :i100 "Analysis/1/Data/BCLConvert/fastq"))]
+                                               :i100 "Analysis/1/Data/BCLConvert/fastq"))
+        read-length (case instrument-type
+                      :miseq (first (:Reads samplesheet-template))
+                      :nextseq (:Read1Cycles (:Reads samplesheet-template))
+                      :i100 (:Read1Cycles (:Reads samplesheet-template)))
+        flowcell-id (last (str/split run-id #"_"))
+        reads-per-sample (or (:reads-per-sample config) 100)]
     {:run-id run-id
      :instrument-id instrument-id
      :instrument-type instrument-type
@@ -159,6 +170,14 @@
      :samplesheet-string samplesheet-string
      :samplesheet-files samplesheet-files
      :fastq-subdir fastq-subdir
+     :fastq-params {:read-length read-length
+                    :instrument instrument-id
+                    :run-number padded-run-num
+                    :flowcell-id flowcell-id
+                    :lane 1
+                    :tile 1101
+                    :error-profile {:L 0.1 :k 0.05 :x0 200}
+                    :num-reads reads-per-sample}
      :mark-upload-complete (:mark-upload-complete config)
      :mark-qc-check-complete (:mark-qc-check-complete config)}))
 
@@ -166,7 +185,8 @@
 (defn write-run!
   [{:keys [run-id run-output-dir samples num-samples
            samplesheet-string samplesheet-files
-           fastq-subdir mark-upload-complete mark-qc-check-complete]}]
+           fastq-subdir fastq-params reference-seqs
+           mark-upload-complete mark-qc-check-complete]}]
   (.mkdirs run-output-dir)
   (util/log! {:timestamp (util/now!)
               :event "created_run_output_dir"
@@ -194,15 +214,16 @@
               :fastq-subdir (str fastq-subdir)})
 
   (doseq [[sample-num sample] (map-indexed vector samples)]
-    (.createNewFile (io/file fastq-subdir (str (:Sample_ID sample) "_S" sample-num "_L001_R1_001.fastq.gz"))))
-  (doseq [[sample-num sample] (map-indexed vector samples)]
-    (.createNewFile (io/file fastq-subdir (str (:Sample_ID sample) "_S" sample-num "_L001_R2_001.fastq.gz"))))
+    (let [species-list (:_species sample)
+          sample-refs (select-keys reference-seqs species-list)]
+      (fastq/write-sample-fastqs! fastq-subdir sample-num sample
+                                  (assoc fastq-params :reference-seqs sample-refs))))
 
   (util/log! {:timestamp (util/now!)
-              :event "created_fastq_symlinks"
+              :event "created_fastq_files"
               :run-id run-id
               :fastq-subdir (str fastq-subdir)
-              :num-symlinks (* num-samples 2)})
+              :num-fastq-files (* num-samples 2)})
 
   (when mark-upload-complete
     (let [f (io/file run-output-dir "upload_complete.json")]
@@ -244,7 +265,7 @@
                :run-num (get-in @db [:current-run-num-by-instrument-id (:instrument-id instrument)])
                :plates plates
                :config (:config @db)})]
-    (write-run! plan)
+    (write-run! (assoc plan :reference-seqs (:reference-seqs @db)))
     (swap! db update-in [:current-run-num-by-instrument-id (:instrument-id instrument)] inc)
     (swap! db update :current-plate-number + (count plates))
     plan))
@@ -268,6 +289,11 @@
 
   (let [config (util/load-edn! (get-in opts [:options :config]))]
     (swap! db assoc :config config))
+
+  (swap! db assoc :reference-seqs (reference/load-references!))
+  (util/log! {:timestamp (util/now!)
+              :event "loaded_reference_genomes"
+              :num-references (count (:reference-seqs @db))})
 
   (swap! db assoc :current-run-num-by-instrument-id
          (into {} (map (juxt :instrument-id :starting-run-number) (get-in @db [:config :instruments]))))
