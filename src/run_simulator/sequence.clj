@@ -2,6 +2,12 @@
   )
 
 
+(defn random-seq
+  "Generate a random DNA sequence of the given length (uniform A/C/G/T)."
+  [len]
+  (apply str (repeatedly len #(rand-nth [\A \C \G \T]))))
+
+
 (defn reverse-complement
   "Return the reverse complement of a DNA sequence. Handles upper/lowercase and N."
   [s]

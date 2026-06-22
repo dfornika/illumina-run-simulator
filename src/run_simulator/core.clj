@@ -51,7 +51,8 @@
                       :miseq :Sample_Project
                       :nextseq :ProjectName
                       :i100 :ProjectName)
-        primary-species (util/weighted-random-select (:species project))
+        primary-species (when (seq (:species project))
+                          (util/weighted-random-select (:species project)))
         index-with-project (assoc index-with-sample-id
                                   project-key project-name
                                   :_primary-species primary-species

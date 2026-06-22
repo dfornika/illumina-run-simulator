@@ -24,10 +24,18 @@
   [{:keys [reference-seq read-length read-index
            instrument run-number flowcell-id lane tile
            index-sequence error-profile]}]
-  (let [fragment-length (min (* 2 read-length) (count reference-seq))
-        effective-read-length (min read-length (quot fragment-length 2))
-        {:keys [subseq]} (seq/random-subseq reference-seq fragment-length)
-        {:keys [r1 r2]} (seq/reads-from-seq subseq effective-read-length)
+  (let [use-random (nil? reference-seq)
+        fragment-length (if use-random
+                          (* 2 read-length)
+                          (min (* 2 read-length) (count reference-seq)))
+        effective-read-length (if use-random
+                                read-length
+                                (min read-length (quot fragment-length 2)))
+        {:keys [r1 r2]} (if use-random
+                           {:r1 (seq/random-seq effective-read-length)
+                            :r2 (seq/random-seq effective-read-length)}
+                           (let [{:keys [subseq]} (seq/random-subseq reference-seq fragment-length)]
+                             (seq/reads-from-seq subseq effective-read-length)))
         r1-quals (seq/generate-quality-scores effective-read-length error-profile)
         r2-quals (seq/generate-quality-scores effective-read-length error-profile)
         r1-seq (seq/introduce-errors r1 r1-quals)

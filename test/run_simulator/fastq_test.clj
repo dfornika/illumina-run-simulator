@@ -69,6 +69,23 @@
       (t/is (str/includes? r2-header " 2:")))))
 
 
+(t/deftest generate-read-pair-no-reference-unit
+  (t/testing "Generates valid reads with random sequence when reference-seq is nil"
+    (let [result (fastq/generate-read-pair
+                  {:reference-seq nil
+                   :read-length 50
+                   :read-index 0
+                   :instrument "M00123"
+                   :run-number "0001"
+                   :flowcell-id "FLOWCELL"
+                   :lane 1
+                   :tile 1101
+                   :index-sequence "ACGT+TGCA"
+                   :error-profile {:L 0.1 :k 0.05 :x0 200}})]
+      (t/is (= 4 (count (str/split-lines (:r1-record result)))))
+      (t/is (= 4 (count (str/split-lines (:r2-record result))))))))
+
+
 (def ^:private base-fastq-params
   {:read-length 50
    :instrument "M00123"

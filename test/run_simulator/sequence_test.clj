@@ -3,6 +3,14 @@
             [run-simulator.sequence :as seq]))
 
 
+(t/deftest random-seq-unit
+  (t/testing "Returns correct length"
+    (t/is (= 100 (count (seq/random-seq 100))))
+    (t/is (= 0 (count (seq/random-seq 0)))))
+  (t/testing "Only contains valid bases"
+    (t/is (every? #{\A \C \G \T} (seq/random-seq 1000)))))
+
+
 (t/deftest reverse-complement-unit
   (t/testing "Simple cases"
     (t/is (= "ACGT" (seq/reverse-complement "ACGT")))
