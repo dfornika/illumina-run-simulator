@@ -255,12 +255,18 @@
 
 (defn simulate-run!
   "Simulate one sequencing run: select instrument, generate plates, plan the run, and write output."
-  [db & {:keys [instrument-type]}]
+  [db & {:keys [instrument-type instrument-id output-dir]}]
   (let [available-instruments (get-in @db [:config :instruments])
         available-instruments (if instrument-type
                                 (filter #(= instrument-type (:instrument-type %)) available-instruments)
                                 available-instruments)
+        available-instruments (if instrument-id
+                                (filter #(= instrument-id (:instrument-id %)) available-instruments)
+                                available-instruments)
         instrument (util/randomly-select available-instruments)
+        instrument (if output-dir
+                     (assoc instrument :output-dir output-dir)
+                     instrument)
         inst-type (:instrument-type instrument)
         indexes (load-indexes inst-type)
         idx-by-set (indexes-by-set indexes)
@@ -302,23 +308,35 @@
   (let [config (util/load-edn! (get-in opts [:options :config]))]
     (swap! db assoc :config config))
 
-  (swap! db assoc :reference-seqs (reference/load-references!))
-  (util/log! {:timestamp (util/now!)
-              :event "loaded_reference_genomes"
-              :num-references (count (:reference-seqs @db))})
+  (let [cli-opts (:options opts)
+        instrument-type (keyword (:instrument-type cli-opts))
+        instrument-id (:instrument-id cli-opts)
+        output-dir (:output-dir cli-opts)
+        num-runs (:num-runs cli-opts)]
 
-  (swap! db assoc :current-run-num-by-instrument-id
-         (into {} (map (juxt :instrument-id :starting-run-number) (get-in @db [:config :instruments]))))
+    (when instrument-id
+      (let [known-ids (set (map :instrument-id (get-in @db [:config :instruments])))]
+        (when-not (contains? known-ids instrument-id)
+          (cli/exit 1 (str "Unknown instrument ID '" instrument-id "'. Known IDs: " (str/join ", " (sort known-ids)))))))
 
-  (swap! db assoc :current-date (util/iso-date-str->date (get-in @db [:config :starting-date])))
+    (swap! db assoc :reference-seqs (reference/load-references!))
+    (util/log! {:timestamp (util/now!)
+                :event "loaded_reference_genomes"
+                :num-references (count (:reference-seqs @db))})
 
-  (swap! db assoc :current-plate-number (get-in @db [:config :starting-plate-number]))
+    (swap! db assoc :current-run-num-by-instrument-id
+           (into {} (map (juxt :instrument-id :starting-run-number) (get-in @db [:config :instruments]))))
 
-  (loop []
-    (simulate-run! db)
-    (Thread/sleep (get-in @db [:config :run-interval-ms]))
-    (swap! db update :current-date #(.plusDays % (util/rand-int-range 1 10)))
-    (recur)))
+    (swap! db assoc :current-date (util/iso-date-str->date (get-in @db [:config :starting-date])))
+
+    (swap! db assoc :current-plate-number (get-in @db [:config :starting-plate-number]))
+
+    (dotimes [_ num-runs]
+      (simulate-run! db
+                     :instrument-type instrument-type
+                     :instrument-id instrument-id
+                     :output-dir output-dir)
+      (swap! db update :current-date #(.plusDays % (util/rand-int-range 1 10))))))
 
 
 (comment

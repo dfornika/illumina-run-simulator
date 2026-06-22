@@ -16,9 +16,20 @@
        (str/join \newline)))
 
 
+(def valid-instrument-types #{"nextseq" "miseq" "i100"})
+
 (def options
   [["-c" "--config CONFIG_FILE" "Config file"
     :validate [#(.exists (io/as-file %)) #(str "Config file '" % "' does not exist.")]]
+   ["-t" "--instrument-type TYPE" "Instrument type (nextseq, miseq, i100)"
+    :default "nextseq"
+    :validate [#(contains? valid-instrument-types %) #(str "Invalid instrument type '" % "'. Must be one of: nextseq, miseq, i100")]]
+   ["-i" "--instrument-id ID" "Instrument ID (eg. VH00123). If omitted, a random instrument of the specified type is selected."]
+   ["-o" "--output-dir DIR" "Output directory (overrides config)"]
+   ["-n" "--num-runs N" "Number of runs to generate"
+    :default 1
+    :parse-fn #(Integer/parseInt %)
+    :validate [pos? "Must be a positive integer"]]
    ["-h" "--help"]
    ["-v" "--version"]])
 
