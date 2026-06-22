@@ -5,6 +5,7 @@
 
 
 (defn generate-tiles
+  "Generate a :Tiles XML structure with all tile IDs for a NextSeq flowcell layout."
   []
   (let [tiles (for [y (range 11 25)
                     x (map #(format "%02d" %) (range 1 5))]
@@ -13,7 +14,7 @@
 
 
 (defn generate-runinfo-data-miseq
-  ""
+  "Generate a RunInfo.xml data structure (as Hiccup) for a MiSeq run."
   [run-id read-len]
   (let [run-id-split (str/split run-id #"_")
         date (first run-id-split)
@@ -34,7 +35,7 @@
 
 
 (defn generate-runinfo-data-nextseq
-  ""
+  "Generate a RunInfo.xml data structure (as Hiccup) for a NextSeq run."
   [run-id read-len]
   (let [run-id-split (str/split run-id #"_")
         date (str (str/split (util/now-utc!) #"\.") "Z")

@@ -17,6 +17,7 @@
 
 
 (defn generate-run-id
+  "Build an Illumina run ID from date, instrument, run number, and a generated flowcell ID."
   [date-str instrument-id run-num instrument-type]
   (let [eight-digit-date (str/replace date-str "-" "")
         six-digit-date (apply str (drop 2 eight-digit-date))
@@ -32,6 +33,7 @@
 
 
 (defn generate-sample-id
+  "Generate a sample ID: container-plate-indexset-well."
   [plate-num index]
   (str/join "-" [(gen/generate generators/container-id)
                  plate-num
@@ -40,6 +42,7 @@
 
 
 (defn generate-sample
+  "Build a sample record from an index, assigning a sample ID, project, species, and instrument-specific blank fields."
   [plate-num instrument-type index project]
   (let [sample-id (generate-sample-id plate-num index)
         index-with-sample-id (assoc index :Sample_ID sample-id)
@@ -59,6 +62,7 @@
 
 
 (defn random-plate-size
+  "Return a random plate size: 70% chance of full plate, otherwise random between half and max."
   [max-samples]
   (if (< (rand) 0.7)
     max-samples
@@ -66,6 +70,7 @@
 
 
 (defn load-indexes
+  "Load index sequences from the CSV resource for the given instrument type."
   [instrument-type]
   (let [indexes-file (case instrument-type
                        :miseq (io/resource "indexes-miseq.csv")
@@ -75,11 +80,13 @@
 
 
 (defn indexes-by-set
+  "Group indexes by :Index_Set, returning {set-id [index ...]}."
   [indexes]
   (into {} (map (fn [[k v]] [k (vec v)]) (group-by :Index_Set indexes))))
 
 
 (defn generate-plate
+  "Generate a plate of samples from one index set and one project."
   [{:keys [plate-num instrument-type indexes project num-samples]}]
   (let [max-samples (min 96 (count indexes))
         num-samples (min max-samples (or num-samples (random-plate-size max-samples)))
@@ -92,6 +99,7 @@
 
 
 (defn generate-plates
+  "Generate multiple plates, each with a different index set and a randomly selected project."
   [{:keys [num-plates starting-plate-num instrument-type indexes-by-set projects]}]
   (let [available-sets (keys indexes-by-set)
         num-plates (min num-plates (count available-sets))]
@@ -106,6 +114,7 @@
 
 
 (defn miseq-fastq-subdir
+  "Return the FASTQ subdirectory path for MiSeq, varying by old vs. new output directory structure."
   ([output-dir-structure-type date-str]
    (case output-dir-structure-type
      :old "Data/Intensities/BaseCalls"
@@ -121,6 +130,7 @@
 
 
 (defn generate-run-plan
+  "Build a complete run plan: run ID, output paths, samplesheet, and FASTQ generation parameters."
   [{:keys [current-date instrument run-num plates config]}]
   (let [date-str (str current-date)
         instrument-id (:instrument-id instrument)
@@ -183,6 +193,7 @@
 
 
 (defn write-run!
+  "Write all run output: directories, samplesheets, FASTQ files, and optional completion markers."
   [{:keys [run-id run-output-dir samples num-samples
            samplesheet-string samplesheet-files
            fastq-subdir fastq-params reference-seqs
@@ -243,6 +254,7 @@
 
 
 (defn simulate-run!
+  "Simulate one sequencing run: select instrument, generate plates, plan the run, and write output."
   [db & {:keys [instrument-type]}]
   (let [available-instruments (get-in @db [:config :instruments])
         available-instruments (if instrument-type

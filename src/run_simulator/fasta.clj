@@ -27,7 +27,7 @@
                                     (conj (into [] (butlast coll)) new-last-elem)))))
 
 (defn parse-fasta
-  ""
+  "Parse a FASTA file into a vector of {:id :description :sequence} records."
   [fasta-path]
   (let [fasta-str (slurp fasta-path)
         fasta-lines (filter #(not (= "" (str/trim %))) (str/split-lines fasta-str))]

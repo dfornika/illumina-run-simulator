@@ -3,7 +3,7 @@
 
 
 (defn reverse-complement
-  ""
+  "Return the reverse complement of a DNA sequence. Handles upper/lowercase and N."
   [s]
   (let [base-complement {\A \T
                          \C \G
@@ -40,7 +40,7 @@
 
 
 (defn reads-from-seq
-  ""
+  "Extract paired-end reads: R1 from the start, R2 as reverse complement from the end."
   [s len]
   (let [seq-length (count s)
         r1 (subs s 0 len)
@@ -50,7 +50,7 @@
 
 
 (defn flat-error-profile
-  ""
+  "Constant error probability regardless of read position."
   [x n]
   n)
 
@@ -74,16 +74,19 @@
 
 
 (defn probability->phred
+  "Convert error probability to PHRED quality score: round(-10 * log10(p))."
   [prob-error]
   (Math/round (* -10 (Math/log10 prob-error))))
 
 
 (defn phred->char
+  "Convert PHRED score to ASCII quality character (PHRED+33 encoding)."
   [phred]
   (char (+ phred 33)))
 
 
 (defn generate-quality-scores
+  "Generate a vector of PHRED quality scores for a read, using a logistic error profile with per-position jitter."
   [read-length {:keys [L k x0] :or {L 0.1 k 0.05 x0 200}}]
   (mapv (fn [pos]
           (let [base-prob (logistic-error-profile pos L k x0)
@@ -94,11 +97,13 @@
 
 
 (defn quality-scores->string
+  "Convert a vector of PHRED scores to a FASTQ quality string."
   [scores]
   (apply str (map phred->char scores)))
 
 
 (defn introduce-errors
+  "Randomly substitute bases at positions where quality is low, consistent with PHRED error probabilities."
   [seq-str quality-scores]
   (apply str
          (map (fn [base phred]

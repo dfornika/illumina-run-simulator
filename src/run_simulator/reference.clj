@@ -5,12 +5,14 @@
 
 
 (defn load-registry!
+  "Read the reference genome registry from resources/references.edn."
   []
   (with-open [r (io/reader (io/resource "references.edn"))]
     (edn/read (java.io.PushbackReader. r))))
 
 
 (defn load-references!
+  "Load all reference genomes from the registry, returning {species-name sequence-string}."
   []
   (let [registry (load-registry!)]
     (into {}

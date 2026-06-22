@@ -6,6 +6,7 @@
 
 
 (defn format-fastq-header
+  "Format an Illumina FASTQ header: @instrument:run:flowcell:lane:tile:x:y read:filter:control:index."
   [{:keys [instrument run-number flowcell-id lane tile x-pos y-pos
            read is-filtered control-number index-sequence]}]
   (str "@" (str/join ":" [instrument run-number flowcell-id lane tile x-pos y-pos])
@@ -13,11 +14,13 @@
 
 
 (defn format-fastq-record
+  "Assemble a 4-line FASTQ record from header, sequence, and quality strings."
   [header seq-str qual-str]
   (str header "\n" seq-str "\n+\n" qual-str))
 
 
 (defn generate-read-pair
+  "Generate one paired-end read pair (R1 forward, R2 reverse complement) with quality scores and errors."
   [{:keys [reference-seq read-length read-index
            instrument run-number flowcell-id lane tile
            index-sequence error-profile]}]
@@ -52,6 +55,7 @@
 
 
 (defn generate-sample-fastq
+  "Generate R1 and R2 FASTQ content for a sample, distributing reads across reference species."
   [{:keys [reference-seqs read-length num-reads
            instrument run-number flowcell-id lane tile
            index-sequence error-profile]}]
@@ -82,6 +86,7 @@
 
 
 (defn write-fastq-gz!
+  "Write string content as a gzip-compressed file."
   [path content]
   (with-open [out (-> (io/output-stream (io/file path))
                       (GZIPOutputStream.)
@@ -90,6 +95,7 @@
 
 
 (defn write-sample-fastqs!
+  "Generate and write gzipped R1 and R2 FASTQ files for a sample using Illumina naming conventions."
   [fastq-subdir sample-num sample fastq-params]
   (let [sample-id (:Sample_ID sample)
         index-seq (str (or (:index sample) (:Index sample) "")

@@ -15,13 +15,13 @@
 
 
 (defn float->qseq
-  ""
+  "Convert a float coordinate to QSEQ integer format: round(n * 10 + 1000)."
   [n]
   (Math/round (+ (* n 10) 1000)))
 
 
 (defn num-clusters
-  ""
+  "Read the cluster count from bytes 8-11 of a .locs file header (little-endian)."
   [locs-bytes]
   (let [locs-header (take locs-header-size locs-bytes)
         num-clusters-bytes (byte-array (drop 8 locs-header))]
@@ -51,7 +51,7 @@
 
 
 (defn coord->byteseq
-  ""
+  "Convert a coordinate {:x-float :y-float} to an 8-byte little-endian sequence."
   [coord]
   (let [{:keys [x-float y-float]} coord
         x-bytes (util/float->bytes x-float :little-endian)
@@ -60,7 +60,7 @@
 
 
 (defn random-coord
-  ""
+  "Generate a random coordinate within the given x/y bounds, returning both float and QSEQ formats."
   [{:keys [min-x min-y max-x max-y]}]
   (let [x-float (util/rand-between min-x max-x)
         x-qseq (float->qseq x-float)

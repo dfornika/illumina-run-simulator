@@ -17,7 +17,7 @@
 
 
 (defn serialize-map-to-xml
-  ""
+  "Convert a nested map to an indented XML string via make-xml-node."
   [m]
   (->> m
        (map make-xml-node)
