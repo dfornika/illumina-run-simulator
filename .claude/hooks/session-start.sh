@@ -5,6 +5,8 @@ if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
   exit 0
 fi
 
+echo '{"async": true, "asyncTimeout": 300000}'
+
 install_clojure() {
   if command -v clojure &>/dev/null; then
     return 0
