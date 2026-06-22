@@ -3,7 +3,7 @@
             [clojure.string :as str]
             [clojure.tools.cli :refer [parse-opts]]
             [clojure.spec.alpha :as spec]
-            [clojure.spec.gen.alpha :as spec-gen]
+            [clojure.spec.gen.alpha :as gen]
             [run-simulator.cli :as cli]
             [run-simulator.util :as util]
             [run-simulator.generators :as generators]
@@ -23,9 +23,9 @@
                :nextseq six-digit-date
                :i100 eight-digit-date)
         run-id (case instrument-type
-                 :miseq (first (spec-gen/sample generators/miseq-flowcell-id 1))
-                 :nextseq (first (spec-gen/sample generators/nextseq-flowcell-id 1))
-                 :i100 (first (spec-gen/sample generators/i100-flowcell-id 1)))]
+                 :miseq (gen/generate generators/miseq-flowcell-id)
+                 :nextseq (gen/generate generators/nextseq-flowcell-id)
+                 :i100 (gen/generate generators/i100-flowcell-id))]
     (str/join "_" [date
                    instrument-id
                    run-num
@@ -35,7 +35,7 @@
 (defn generate-sample-id
   ""
   [plate-num index]
-  (str/join "-" [(first (spec-gen/sample generators/container-id 1))
+  (str/join "-" [(gen/generate generators/container-id)
                  plate-num
                  (:Index_Set index)
                  (:Index_Plate_Well index)]))
@@ -84,11 +84,11 @@
   ([output-dir-strucutre-type db]
    (case output-dir-strucutre-type
      :old "Data/Intensities/BaseCalls"
-     :new (str (io/file "Alignment_1" (str (str/replace (str (:current-date @db)) "-" "") "_" (first (spec-gen/sample generators/six-digit-timestamp 1))) "Fastq"))))
+     :new (str (io/file "Alignment_1" (str (str/replace (str (:current-date @db)) "-" "") "_" (gen/generate generators/six-digit-timestamp)) "Fastq"))))
   ([output-dir-strucutre-type demultiplexing-num db]
    (case output-dir-strucutre-type
      :old "Data/Intensities/BaseCalls"
-     :new (str (io/file (str "Alignment_" demultiplexing-num) (str (str/replace (str (:current-date @db)) "-" "") "_" (first (spec-gen/sample generators/six-digit-timestamp 1))) "Fastq")))))
+     :new (str (io/file (str "Alignment_" demultiplexing-num) (str (str/replace (str (:current-date @db)) "-" "") "_" (gen/generate generators/six-digit-timestamp)) "Fastq")))))
 
 
 (defn simulate-run!
