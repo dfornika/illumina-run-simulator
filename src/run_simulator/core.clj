@@ -38,20 +38,66 @@
 
 
 (defn generate-sample
-  [plate-num instrument-type index projects]
+  [plate-num instrument-type index project]
   (let [sample-id (generate-sample-id plate-num index)
         index-with-sample-id (assoc index :Sample_ID sample-id)
-        project-id (util/randomly-select (conj projects ""))
         project-key (case instrument-type
                       :miseq :Sample_Project
                       :nextseq :ProjectName
                       :i100 :ProjectName)
-        index-with-project (assoc index-with-sample-id project-key project-id)
+        index-with-project (assoc index-with-sample-id project-key project)
         blank-fields (case instrument-type
                        :miseq [:Sample_Name :Sample_Plate :Sample_Well :Description]
                        :nextseq [:LibraryName :LibraryPrepKitUrn :LibraryPrepKitName :IndexAdapterKitUrn :IndexAdapterKitName]
                        :i100 [:LibraryName :LibraryPrepKitUrn :LibraryPrepKitName :IndexAdapterKitUrn :IndexAdapterKitName])]
     (reduce #(assoc % %2 "") index-with-project blank-fields)))
+
+
+(defn random-plate-size
+  [max-samples]
+  (if (< (rand) 0.7)
+    max-samples
+    (max 1 (+ (quot max-samples 2) (rand-int (- max-samples (quot max-samples 2)))))))
+
+
+(defn load-indexes
+  [instrument-type]
+  (let [indexes-file (case instrument-type
+                       :miseq (io/resource "indexes-miseq.csv")
+                       :nextseq (io/resource "indexes-nextseq.csv")
+                       :i100 (io/resource "indexes-i100.csv"))]
+    (util/load-csv! indexes-file)))
+
+
+(defn indexes-by-set
+  [indexes]
+  (into {} (map (fn [[k v]] [k (vec v)]) (group-by :Index_Set indexes))))
+
+
+(defn generate-plate
+  [{:keys [plate-num instrument-type indexes project num-samples]}]
+  (let [max-samples (min 96 (count indexes))
+        num-samples (min max-samples (or num-samples (random-plate-size max-samples)))
+        selected-indexes (take num-samples indexes)
+        samples (mapv #(generate-sample plate-num instrument-type % project)
+                      selected-indexes)]
+    {:plate-num plate-num
+     :project project
+     :samples samples}))
+
+
+(defn generate-plates
+  [{:keys [num-plates starting-plate-num instrument-type indexes-by-set projects]}]
+  (let [available-sets (keys indexes-by-set)
+        num-plates (min num-plates (count available-sets))]
+    (mapv (fn [i index-set-id]
+            (generate-plate
+             {:plate-num (+ starting-plate-num i)
+              :instrument-type instrument-type
+              :indexes (get indexes-by-set index-set-id)
+              :project (util/randomly-select projects)}))
+          (range num-plates)
+          (take num-plates available-sets))))
 
 
 (defn miseq-fastq-subdir
@@ -70,7 +116,7 @@
 
 
 (defn generate-run-plan
-  [{:keys [current-date instrument run-num plate-num projects config]}]
+  [{:keys [current-date instrument run-num plates config]}]
   (let [date-str (str current-date)
         instrument-id (:instrument-id instrument)
         instrument-type (:instrument-type instrument)
@@ -80,19 +126,7 @@
                          :i100 (format "%04d" run-num))
         run-id (generate-run-id date-str instrument-id padded-run-num instrument-type)
         run-output-dir (io/file (:output-dir instrument) run-id)
-        indexes-file (case instrument-type
-                       :miseq (io/resource "indexes-miseq.csv")
-                       :nextseq (io/resource "indexes-nextseq.csv")
-                       :i100 (io/resource "indexes-i100.csv"))
-        indexes (util/load-csv! indexes-file)
-        num-samples (rand-int (count indexes))
-        samples (mapv (fn [i index]
-                        (generate-sample (+ plate-num (quot i 96)) instrument-type index projects))
-                      (range num-samples)
-                      (take num-samples indexes))
-        plates-consumed (if (pos? num-samples)
-                          (inc (quot (dec num-samples) 96))
-                          0)
+        samples (into [] (mapcat :samples) plates)
         samplesheet-template (case instrument-type
                                :miseq (util/load-edn! (io/resource "samplesheet-template-miseq.edn"))
                                :nextseq (util/load-edn! (io/resource "samplesheet-template-nextseq.edn"))
@@ -119,12 +153,12 @@
      :instrument-id instrument-id
      :instrument-type instrument-type
      :run-output-dir run-output-dir
+     :plates plates
      :samples samples
-     :num-samples num-samples
+     :num-samples (count samples)
      :samplesheet-string samplesheet-string
      :samplesheet-files samplesheet-files
      :fastq-subdir fastq-subdir
-     :plates-consumed plates-consumed
      :mark-upload-complete (:mark-upload-complete config)
      :mark-qc-check-complete (:mark-qc-check-complete config)}))
 
@@ -194,16 +228,25 @@
                                 (filter #(= instrument-type (:instrument-type %)) available-instruments)
                                 available-instruments)
         instrument (util/randomly-select available-instruments)
+        inst-type (:instrument-type instrument)
+        indexes (load-indexes inst-type)
+        idx-by-set (indexes-by-set indexes)
+        num-plates (inc (rand-int (count idx-by-set)))
+        plates (generate-plates
+                {:num-plates num-plates
+                 :starting-plate-num (:current-plate-number @db)
+                 :instrument-type inst-type
+                 :indexes-by-set idx-by-set
+                 :projects (get-in @db [:config :projects])})
         plan (generate-run-plan
               {:current-date (:current-date @db)
                :instrument instrument
                :run-num (get-in @db [:current-run-num-by-instrument-id (:instrument-id instrument)])
-               :plate-num (:current-plate-number @db)
-               :projects (get-in @db [:config :projects])
+               :plates plates
                :config (:config @db)})]
     (write-run! plan)
     (swap! db update-in [:current-run-num-by-instrument-id (:instrument-id instrument)] inc)
-    (swap! db update :current-plate-number + (:plates-consumed plan))
+    (swap! db update :current-plate-number + (count plates))
     plan))
 
 
