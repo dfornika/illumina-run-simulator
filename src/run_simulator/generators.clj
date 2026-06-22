@@ -154,7 +154,7 @@
 
 
 (def ordered-nat-pair
-  (let [nat (gen/large-integer* {:min 0})]
+  (let [nat (gen/large-integer* {:min 0 :max (quot Long/MAX_VALUE 2)})]
     (gen/bind nat
               (fn [lo]
                 (gen/fmap (fn [hi] [lo hi])
