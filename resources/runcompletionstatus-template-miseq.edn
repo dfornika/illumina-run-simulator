@@ -1,0 +1,10 @@
+{:RunCompletionStatus
+ {:Version "1"
+  :CompletionStatus "SuccessfullyCompleted"
+  :RunId nil
+  :StepCompleted "23"
+  :TotalSteps "23"
+  :CycleCompleted "322"
+  :TotalCycles "322"
+  :CurrectStepDescription "End"
+  :ErrorDescription "None"}}

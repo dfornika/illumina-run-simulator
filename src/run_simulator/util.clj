@@ -6,7 +6,8 @@
             [clojure.data.csv :as csv])
   (:import  [java.time.format DateTimeFormatter]
             [java.time ZonedDateTime]
-            [java.time LocalDate]))
+            [java.time LocalDate]
+            [java.nio ByteBuffer]))
 
 
 (defn csv-data->maps
@@ -65,6 +66,11 @@
   (.. (ZonedDateTime/now) (format DateTimeFormatter/ISO_OFFSET_DATE_TIME)))
 
 
+(defn now-utc!
+  []
+  (.. (ZonedDateTime/now) (format DateTimeFormatter/ISO_INSTANT)))
+
+
 (defn iso-date-str->date
   "
   "
@@ -120,3 +126,88 @@
   "Random int between min (inclusive) and max (exclusive)"
   [min max]
   (+ min (rand-int (- max min))))
+
+
+(defn rand-between
+  [a b]
+  (+ a (* (- b a) (rand))))
+
+
+(defn bytes->long
+  [bs & [endianness]]
+  {:pre [(bytes? bs)]}
+  (let [endianness (if (= endianness :little-endian)
+                     java.nio.ByteOrder/LITTLE_ENDIAN
+                     java.nio.ByteOrder/BIG_ENDIAN)]
+    (-> bs
+        (ByteBuffer/wrap)
+        (.order endianness)
+        .getLong)))
+
+
+(defn long->bytes
+  [n & [endianness]]
+  (let [buf (ByteBuffer/allocate 8)
+        endianness (if (= endianness :little-endian)
+                     java.nio.ByteOrder/LITTLE_ENDIAN
+                     java.nio.ByteOrder/BIG_ENDIAN)]
+    (.order buf endianness)
+    (.putLong buf n)
+    (.array buf)))
+
+
+(defn bytes->float
+  [bs & [endianness]]
+  {:pre [(bytes? bs)]}
+  (let [endianness (if (= endianness :little-endian)
+                     java.nio.ByteOrder/LITTLE_ENDIAN
+                     java.nio.ByteOrder/BIG_ENDIAN)]
+    (-> bs
+        (ByteBuffer/wrap)
+        (.order endianness)
+        .getFloat)))
+
+
+(defn float->bytes
+  [n & [endianness]]
+  (let [buf (ByteBuffer/allocate 4)
+        endianness (if (= endianness :little-endian)
+                     java.nio.ByteOrder/LITTLE_ENDIAN
+                     java.nio.ByteOrder/BIG_ENDIAN)]
+    (.order buf endianness)
+    (.putFloat buf n)
+    (.array buf)))
+
+
+(defn byte->boolean
+  [b]
+  (not (= 0x00 b)))
+
+
+(defn slurp-bytes
+  [path]
+  (with-open [in (io/input-stream path)
+              out (java.io.ByteArrayOutputStream.)]
+    (io/copy in out)
+    (.toByteArray out)))
+
+
+(defn hexify-byte
+  [b]
+  (let [hex [\0 \1 \2 \3 \4 \5 \6 \7 \8 \9 \a \b \c \d \e \f]
+        v (bit-and b 0xFF)]
+    (str (hex (bit-shift-right v 4)) (hex (bit-and v 0x0F)))))
+
+
+(defn hexify
+  [coll]
+  (apply str (mapcat hexify-byte coll)))
+
+
+(defn unhexify
+  [s]
+  (letfn [(unhexify-2 [c1 c2]
+            (unchecked-byte
+             (+ (bit-shift-left (Character/digit c1 16) 4)
+                (Character/digit c2 16))))]
+    (map #(apply unhexify-2 %) (partition 2 s))))

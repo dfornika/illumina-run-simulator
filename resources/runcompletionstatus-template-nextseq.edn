@@ -1,0 +1,5 @@
+{:SequenceRunCompletionStatus
+ {:RunStatus "InstrumentComplete"
+  :LeakTrayHalfFull "false"
+  :LeakTrayFull "false"
+  :FlowCellLeak "false"}}
