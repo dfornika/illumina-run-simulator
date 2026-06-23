@@ -16,7 +16,9 @@
             [run-simulator.bcl :as bcl]
             [run-simulator.locs :as locs]
             [run-simulator.filter :as filt]
-            [run-simulator.runinfo :as runinfo])
+            [run-simulator.runinfo :as runinfo]
+            [run-simulator.runparameters :as runparameters]
+            [run-simulator.runcompletionstatus :as runcompletionstatus])
   (:gen-class))
 
 
@@ -221,6 +223,39 @@
                :data {:run-id run-id :path (str path)}})))
 
 
+(defn write-runparameters-xml!
+  "Write RunParameters.xml for the run."
+  [{:keys [run-id run-output-dir instrument-type instrument-id fastq-params]}]
+  (let [read-length (:read-length fastq-params)
+        flowcell-id (:flowcell-id fastq-params)
+        data (case instrument-type
+               :miseq (runparameters/generate-runparameters-data-miseq flowcell-id)
+               :nextseq (runparameters/generate-runparameters-data-nextseq
+                         instrument-id flowcell-id read-length (str run-output-dir))
+               :i100 (runparameters/generate-runparameters-data-nextseq
+                      instrument-id flowcell-id read-length (str run-output-dir)))
+        xml-str (runparameters/serialize-map-to-xml data)
+        path (io/file run-output-dir "RunParameters.xml")]
+    (spit path xml-str)
+    (tel/log! {:level :info :id :run/created-runparameters-xml
+               :data {:run-id run-id :path (str path)}})))
+
+
+(defn write-runcompletionstatus-xml!
+  "Write RunCompletionStatus.xml for the run."
+  [{:keys [run-id run-output-dir instrument-type fastq-params]}]
+  (let [read-length (:read-length fastq-params)
+        data (case instrument-type
+               :miseq (runcompletionstatus/generate-runcompletionstatus-data-miseq run-id read-length)
+               :nextseq (runcompletionstatus/generate-runcompletionstatus-data-nextseq)
+               :i100 (runcompletionstatus/generate-runcompletionstatus-data-nextseq))
+        xml-str (runparameters/serialize-map-to-xml data)
+        path (io/file run-output-dir "RunCompletionStatus.xml")]
+    (spit path xml-str)
+    (tel/log! {:level :info :id :run/created-runcompletionstatus-xml
+               :data {:run-id run-id :path (str path)}})))
+
+
 (defn write-run!
   "Write all run output: directories, samplesheets, BCL, LOCS, filter, FASTQ files, and optional completion markers."
   [{:keys [run-id run-output-dir samples num-samples
@@ -245,6 +280,8 @@
                  :data {:run-id run-id :samplesheet-file (str samplesheet-file)}})))
 
   (write-runinfo-xml! plan)
+  (write-runparameters-xml! plan)
+  (write-runcompletionstatus-xml! plan)
 
   (.mkdirs fastq-subdir)
   (tel/log! {:level :info :id :run/created-fastq-subdir
