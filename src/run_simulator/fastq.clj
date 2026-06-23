@@ -62,7 +62,7 @@
                  r2-seq r2-qual-str)}))
 
 
-(defn- select-reference-seq
+(defn select-reference-seq
   "Select a reference sequence for one read. With probability (1 - cross-contamination-rate),
    returns the primary; otherwise picks uniformly from contaminants."
   [primary-reference-seq contaminant-reference-seqs cross-contamination-rate]
@@ -118,6 +118,36 @@
                        (or (:index2 sample) (:Index2 sample) ""))
         {:keys [r1-content r2-content]}
         (generate-sample-fastq (assoc fastq-params :index-sequence index-seq))
+        r1-path (io/file fastq-subdir (str sample-id "_S" sample-num "_L001_R1_001.fastq.gz"))
+        r2-path (io/file fastq-subdir (str sample-id "_S" sample-num "_L001_R2_001.fastq.gz"))]
+    (write-fastq-gz! r1-path r1-content)
+    (write-fastq-gz! r2-path r2-content)))
+
+
+(defn cluster->fastq-records
+  "Convert a cluster record to formatted R1 and R2 FASTQ record strings."
+  [cluster {:keys [instrument run-number flowcell-id lane tile]}]
+  (let [r1-qual-str (seq/quality-scores->string (:r1-quals cluster))
+        r2-qual-str (seq/quality-scores->string (:r2-quals cluster))
+        base-header {:instrument instrument :run-number run-number
+                     :flowcell-id flowcell-id :lane lane :tile tile
+                     :x-pos (:x-pos cluster) :y-pos (:y-pos cluster)
+                     :is-filtered "N" :control-number 0
+                     :index-sequence (:index-sequence cluster)}]
+    {:r1-record (format-fastq-record
+                 (format-fastq-header (assoc base-header :read 1))
+                 (:r1-bases cluster) r1-qual-str)
+     :r2-record (format-fastq-record
+                 (format-fastq-header (assoc base-header :read 2))
+                 (:r2-bases cluster) r2-qual-str)}))
+
+
+(defn write-sample-fastqs-from-clusters!
+  "Write gzipped R1 and R2 FASTQ files for a sample from pre-generated cluster records."
+  [fastq-subdir sample-num sample-id clusters header-params]
+  (let [records (map #(cluster->fastq-records % header-params) clusters)
+        r1-content (str (str/join "\n" (map :r1-record records)) "\n")
+        r2-content (str (str/join "\n" (map :r2-record records)) "\n")
         r1-path (io/file fastq-subdir (str sample-id "_S" sample-num "_L001_R1_001.fastq.gz"))
         r2-path (io/file fastq-subdir (str sample-id "_S" sample-num "_L001_R2_001.fastq.gz"))]
     (write-fastq-gz! r1-path r1-content)

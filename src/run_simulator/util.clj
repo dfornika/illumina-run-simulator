@@ -141,6 +141,31 @@
   (+ a (* (- b a) (rand))))
 
 
+(defn bytes->int
+  "Convert a 4-byte array to an int. Endianness defaults to big-endian; pass :little-endian to override."
+  [bs & [endianness]]
+  {:pre [(bytes? bs)]}
+  (let [endianness (if (= endianness :little-endian)
+                     java.nio.ByteOrder/LITTLE_ENDIAN
+                     java.nio.ByteOrder/BIG_ENDIAN)]
+    (-> bs
+        (ByteBuffer/wrap)
+        (.order endianness)
+        .getInt)))
+
+
+(defn int->bytes
+  "Convert an int to a 4-byte array. Endianness defaults to big-endian; pass :little-endian to override."
+  [n & [endianness]]
+  (let [buf (ByteBuffer/allocate 4)
+        endianness (if (= endianness :little-endian)
+                     java.nio.ByteOrder/LITTLE_ENDIAN
+                     java.nio.ByteOrder/BIG_ENDIAN)]
+    (.order buf endianness)
+    (.putInt buf (int n))
+    (.array buf)))
+
+
 (defn bytes->long
   "Convert a byte array to a long. Endianness defaults to big-endian; pass :little-endian to override."
   [bs & [endianness]]

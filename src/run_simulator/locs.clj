@@ -25,7 +25,7 @@
   [locs-bytes]
   (let [locs-header (take locs-header-size locs-bytes)
         num-clusters-bytes (byte-array (drop 8 locs-header))]
-    (util/bytes->long num-clusters-bytes :little-endian)))
+    (util/bytes->int num-clusters-bytes :little-endian)))
 
 
 (defn byteseq->coord 
@@ -72,19 +72,17 @@
      :y-qseq  y-qseq}))
  
 
-(comment
-
-  (def test-locs-path "test/resources/picard_s_1_6.locs")
-  (def test-locs-bytes (util/slurp-bytes test-locs-path))
-  (num-clusters test-locs-bytes)
-  (def first-coord (byteseq->coord (take 8 (drop 12 test-locs-bytes))))
-  (coord->byteseq first-coord)
-  (count (partition 8 (drop 12 test-locs-bytes)))
-
-  (with-open [out-file (io/output-stream (io/file "test_out.locs") :append true)]
-    (.write out-file (byte-array (coord->byteseq first-coord)) ))
-  (with-open [out-file (io/output-stream (io/file "test_out.locs") :append true)]
-    (.write out-file (byte-array (coord->byteseq first-coord)) ))
-  
-  
-  )
+(defn write-locs-file!
+  "Write a .locs file for a tile. clusters is a seq of maps with :x-float and :y-float."
+  [path clusters]
+  (let [n (count clusters)
+        magic-bytes (util/int->bytes locs-magic-num :little-endian)
+        version-bytes (util/float->bytes (float locs-version-num) :little-endian)
+        count-bytes (util/int->bytes n :little-endian)]
+    (io/make-parents path)
+    (with-open [out (io/output-stream (io/file path))]
+      (.write out ^bytes magic-bytes)
+      (.write out ^bytes version-bytes)
+      (.write out ^bytes count-bytes)
+      (doseq [cluster clusters]
+        (.write out (byte-array (coord->byteseq cluster)))))))
